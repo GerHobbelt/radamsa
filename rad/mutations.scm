@@ -7,14 +7,14 @@
 
 (define-library (rad mutations)
 
-   (import 
+   (import
       (owl base)
       (rad generic)   ;; shared list mutations
       (rad split)     ;; heuristic splitting
       (rad xp)        ;; xmlish parsing and mutations
       (rad shared))
 
-   (export 
+   (export
       *mutations*
       default-mutations
       string->mutators          ;; cmdline-string → (mutator-node ...)
@@ -23,7 +23,7 @@
    (begin
 
       (define null '())
-      
+
       (define min-score 2)   ;; occurrence-priority = score*priority / total
       (define max-score 10)
 
@@ -89,7 +89,7 @@
             ((lesser? 57 d) #false)
             (else (- d 48))))
 
-      ; → digit|F tail 
+      ; → digit|F tail
       (define (get-num lst)
          (let loop ((lst lst) (n 0) (digits 0))
             (cond
@@ -139,7 +139,7 @@
              (bin? (binarish? lst))
              (lst (flush-bvecs lst (cdr ll))))
             (cond
-               ((eq? n 0) 
+               ((eq? n 0)
                   ;; low priority negative, because could be textual with less frequent numbers
                   (lets ((rs n (rand rs 10)))
                      (if (eq? n 0)
@@ -160,48 +160,48 @@
       ;; todo: swap to generals
 
       (define (sed-byte-drop rs ll meta) ;; drop byte
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs)))
-            (values sed-byte-drop rs 
+            (values sed-byte-drop rs
                (cons (edit-byte-vector (car ll) p (λ (old tl) tl)) (cdr ll))
                (inc meta 'byte-drop) d)))
-      
+
       (define (sed-byte-inc rs ll meta) ;; increment a byte value mod 256
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs)))
-            (values sed-byte-inc rs 
+            (values sed-byte-inc rs
                (cons (edit-byte-vector (car ll) p (λ (old tl) (cons (band 255 (+ old 1)) tl))) (cdr ll))
                (inc meta 'byte-inc) d)))
-      
+
       (define (sed-byte-dec rs ll meta) ;; increment a byte value mod 256
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs)))
-            (values sed-byte-dec rs 
+            (values sed-byte-dec rs
                (cons (edit-byte-vector (car ll) p (λ (old tl) (cons (if (= old 0) 255 (- old 1)) tl))) (cdr ll))
                (inc meta 'byte-dec) d)))
 
       (define (sed-byte-flip rs ll meta) ;; flip a bit in a byte
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs pos (rand rs 8))
              (rs d (rand-delta rs))
              (b (<< 1 pos)))
-            (values sed-byte-flip rs 
+            (values sed-byte-flip rs
                (cons (edit-byte-vector (car ll) p (λ (old tl) (cons (bxor b old) tl))) (cdr ll))
                (inc meta 'byte-inc) d)))
 
       (define (sed-byte-insert rs ll meta) ;; insert a byte
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs))
              (rs b (rand rs 256)))
-            (values sed-byte-insert rs 
+            (values sed-byte-insert rs
                (cons (edit-byte-vector (car ll) p (λ (old tl) (ilist b old tl))) (cdr ll))
                (inc meta 'byte-insert) d)))
-    
+
       ;; rs → rs' n
       (define (repeat-len rs)
          (let loop ((rs rs) (limit #b10))
@@ -210,37 +210,37 @@
                   ((eq? x 0) (rand rs limit))
                   ((= limit #x20000) (rand rs limit)) ; max 128k
                   (else (loop rs (<< limit 1)))))))
-      
+
       (define (push n x lst)
          (if (eq? n 0)
             lst
             (push (- n 1) x (cons x lst))))
 
       (define (sed-byte-repeat rs ll meta) ;; insert a byte
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs))
              (rs n (repeat-len rs)))
-            (values sed-byte-repeat rs 
+            (values sed-byte-repeat rs
                (cons (edit-byte-vector (car ll) p (λ (old tl) (push n old (cons old tl)))) (cdr ll))
                (inc meta 'byte-repeat) d)))
-      
+
       (define (sed-byte-random rs ll meta) ;; swap a byte
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs))
              (rs b (rand rs 256)))
-            (values sed-byte-random rs 
+            (values sed-byte-random rs
                (cons (edit-byte-vector (car ll) p (λ (old tl) (cons b tl))) (cdr ll))
                (inc meta 'byte-random) d)))
-      
+
       (define (sed-byte-perm rs ll meta) ;; permute a few bytes
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs)))
-            (values sed-byte-perm rs 
-               (cons 
-                  (edit-byte-vector (car ll) p 
+            (values sed-byte-perm rs
+               (cons
+                  (edit-byte-vector (car ll) p
                      (λ (old tl)
                         (lets
                            ((lst (cons old tl))
@@ -264,7 +264,7 @@
             ((lst (vector->list (car ll)))
              (rs lst (list-fuse rs lst lst))
              (rs d (rand-delta-up rs)))
-            (values sed-fuse-this rs 
+            (values sed-fuse-this rs
                (flush-bvecs lst (cdr ll))
                (inc meta 'fuse-this)
                d)))
@@ -289,7 +289,7 @@
              (rs abl (list-fuse rs al1 bl))
              (rs abal (list-fuse rs abl al2))
              (rs d (rand-delta-up rs)))
-            (values sed-fuse-next rs 
+            (values sed-fuse-next rs
                (flush-bvecs abal ll) ;; <- on avg 1x, max 2x block sizes
                (inc meta 'fuse-next)
                d)))
@@ -304,9 +304,9 @@
                    (rs b (list-fuse rs ol2 al2)) ; o -> a
                    (rs swap? (rand rs 3)) ;; more likely to keep
                    (rs d (rand-delta-up rs)))
-                  (values 
+                  (values
                      (remember (if (eq? swap? 0) (car ll) block))
-                     rs 
+                     rs
                      (flush-bvecs a (flush-bvecs b (cdr ll))) ;; <- on avg 1x, max 2x block sizes
                      (inc meta 'fuse-old)
                      d))))
@@ -317,9 +317,9 @@
       ;;; Byte Sequences
       ;;;
 
-      ;; todo: convert these to use the generic ones 
+      ;; todo: convert these to use the generic ones
 
-      ;; stutter 
+      ;; stutter
 
       (define (sed-seq-repeat rs ll meta)
          (lets ((n (sizeb (car ll))))
@@ -345,7 +345,7 @@
                   (values sed-seq-repeat rs ll (inc meta 'seq-repeat) delta)))))
 
       (define (sed-seq-del rs ll meta)
-         (lets 
+         (lets
             ((l (vector->list (car ll)))
              (rs l (list-del-seq rs l))
              (rs delta (rand-delta rs)))
@@ -382,7 +382,7 @@
                   #false)
                (else ls))))
 
-      (define (unlines ls) 
+      (define (unlines ls)
          (foldr append null ls))
 
       (define (line-op op name)
@@ -390,7 +390,7 @@
             (let ((ls (try-lines (car ll))))
                (if ls
                   (lets ((rs ls (op rs ls)))
-                     (values self rs 
+                     (values self rs
                         (flush-bvecs (unlines ls) (cdr ll))
                         (inc meta name) 1))
                   (values self rs ll meta -1))))
@@ -402,7 +402,7 @@
                (let ((ls (try-lines (car ll))))
                   (if ls
                      (lets ((rs stp ls (op rs st ls)))
-                        (values (loop stp) rs 
+                        (values (loop stp) rs
                            (flush-bvecs (unlines ls) (cdr ll))
                            (inc meta name) 1))
                      (values (loop st) rs ll meta -1))))))
@@ -473,7 +473,7 @@
                        #xe0001 (#xe0020 . #xe007f) (#x0e40 . #x0e44) #x1f4a9))))))
 
       (define (sed-utf8-widen rs ll meta)
-         (lets 
+         (lets
             ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs))
              (ll
@@ -492,10 +492,10 @@
       ;; insert UTF-8 that might be mishandled
       (define (sed-utf8-insert rs ll meta)
          (lets
-            ((rs p (rand rs (sizeb (car ll)))) 
+            ((rs p (rand rs (sizeb (car ll))))
              (rs d (rand-delta rs))
              (rs bytes (rand-elem rs funny-unicode)))
-            (values sed-utf8-insert rs 
+            (values sed-utf8-insert rs
                (cons (edit-byte-vector (car ll) p (λ (old tl) (append bytes (cons old tl)))) (cdr ll))
                (inc meta 'utf8-insert) d)))
 
@@ -705,7 +705,7 @@
                   ((lst
                      (edit-sublist lst child
                         (λ (node) (cons (repeat-path parent child n-reps) (cdr node))))))
-                  (values sed-tree-stutter rs 
+                  (values sed-tree-stutter rs
                      (flush-bvecs (flatten lst null) (cdr ll))
                      (inc meta 'tree-stutter)
                      +1))
@@ -724,7 +724,7 @@
             (else #false)))
 
       (define (texty? byte)
-         (cond 
+         (cond
             ((< byte 9) #false)
             ((> byte 126) #false)
             ((> byte 31) #true)
@@ -742,7 +742,7 @@
             (cond
                ((null? lst) #true) ;; match short textual input, accidentally also short trailing ones
                ((eq? n 0) #true)
-               ((texty? (car lst)) 
+               ((texty? (car lst))
                   (loop (cdr lst) (- n 1)))
                (else #false))))
 
@@ -764,7 +764,7 @@
                      ;; finish text chunk
                      ((eq? this end)
                         (lets
-                           ((prevr (cdr prevr)) ;; drop the start symbol 
+                           ((prevr (cdr prevr)) ;; drop the start symbol
                             (node (tuple 'delimited start (reverse afterr) end)))
                            (if (null? prevr)
                               (step (cdr lst) null (cons node chunks))
@@ -773,10 +773,10 @@
                      ((eq? this #\\)
                         (cond
                            ((null? (cdr lst))
-                              (step-delimited (cdr lst) start end 
+                              (step-delimited (cdr lst) start end
                                  (cons #\\ afterr) prevr chunks))
                            ((texty? (cadr lst))
-                              (step-delimited (cddr lst) start end 
+                              (step-delimited (cddr lst) start end
                                  (ilist (cadr lst) #\\ afterr) prevr chunks))
                            (else
                               (step-delimited (cdr lst) start end (cons (car lst) afterr) prevr chunks))))
@@ -786,14 +786,14 @@
                      (else
                         (step lst null
                            (flush 'text (append afterr prevr) chunks)))))))
-         
+
          (define (step-text lst seenr chunks)
             (cond
                ((null? lst)
                   (reverse (flush 'text seenr chunks)))
                ((delimiter-of (car lst)) =>
                   (λ (end)
-                     (step-delimited (cdr lst) (car lst) end null 
+                     (step-delimited (cdr lst) (car lst) end null
                         (cons (car lst) seenr) chunks)))
                ((texty? (car lst))
                   (step-text (cdr lst) (cons (car lst) seenr) chunks))
@@ -813,10 +813,10 @@
                      (step-text lst null (flush 'byte rawr chunks))))
                (else
                   (step (cdr lst) (cons (car lst) rawr) chunks))))
-         
+
          (step lst null null))
 
-      (define (string-unlex chunks)  
+      (define (string-unlex chunks)
          (foldr
             (λ (node tail)
                (tuple-case node
@@ -833,7 +833,7 @@
                   (else
                      (error "string-flatten: what kind of node is " node))))
             null chunks))
-                     
+
       (define (random-lex-string rs)
          (lets ((rs n (rand rs 42)))
             (let loop ((rs rs) (n n) (out null))
@@ -850,15 +850,14 @@
                         ((eq? t 4)
                            (lets ((rs a (rand rs 256)))
                               (loop rs n (cons a out))))
-                        (else 
+                        (else
                            (loop rs n (cons #\a out)))))))))
-            
+
       ;; quick string lexer tests
 
       ;; does data stay correct?
       '(let loop ((rs (seed->rands (time-ms))) (n 0) (input '(233 39 39 97 97 97 0)))
          (if (= n 10000)
-            (print "string lex passed tests")
             (lets
                ((rs next (random-lex-string rs))
                 (chunks (string-lex input))
@@ -877,7 +876,7 @@
             (print "Probability " (round (* (/ matched n) 100)) "%"))
          (if (= n 500)
             (print "Probability " (round (* (/ matched n) 100)) "%")
-            (lets 
+            (lets
                ((rs l (random-numbers rs 256 4096))
                 (cs (string-lex l)))
                (loop rs (+ n 1)
@@ -885,7 +884,7 @@
 
       ;;; Text mutations
 
-      ; check that the nodes do look stringy enough to mutate with these 
+      ; check that the nodes do look stringy enough to mutate with these
       ; heuristics, meaning there are some nodes and/or just one, but it's
       ; stringy
       (define (stringy-length cs)
@@ -895,19 +894,19 @@
                ((eq? 'byte (ref (car cs) 1)) #false)
                (else l))))
 
-      (define silly-strings 
+      (define silly-strings
          (map string->list
-            (list 
-               "%n" "%n" "%s" "%d" "%p" "%#x" 
-               "\\0" "aaaa%d%n" 
-               "`xcalc`" ";xcalc" "$(xcalc)" "!xcalc" "\"xcalc" "'xcalc" 
-               "\\x00" "\\r\\n" "\\r" "\\n" "\\x0a" "\\x0d" 
-               "NaN" "+inf" 
-               "$PATH" 
-               "$!!" "!!" "&#000;" "\\u0000" 
+            (list
+               "%n" "%n" "%s" "%d" "%p" "%#x"
+               "\\0" "aaaa%d%n"
+               "`xcalc`" ";xcalc" "$(xcalc)" "!xcalc" "\"xcalc" "'xcalc"
+               "\\x00" "\\r\\n" "\\r" "\\n" "\\x0a" "\\x0d"
+               "NaN" "+inf"
+               "$PATH"
+               "$!!" "!!" "&#000;" "\\u0000"
                "$&" "$+" "$`" "$'" "$1")))
 
-      (define n-sillies 
+      (define n-sillies
          (length silly-strings))
 
       (define (random-silly rs)
@@ -969,7 +968,7 @@
                   (lets
                      ((rs n (rand-as-count rs))
                       (rs pos (rand rs (length lst))))
-                     (values rs 
+                     (values rs
                         (ledn lst pos
                            (λ (tail) (push-as n tail))))))
                (else
@@ -988,22 +987,22 @@
                      (values rs (lset cs p (tuple 'delimited left bs right)))))
                (else is bad
                   (error "string-mutate: what is " bad)))))
-                     
+
       (define (ascii-bad rs ll meta) ;; insert possible badness to ASCII data
          (lets
             ((data (vector->list (car ll)))
              (cs (string-lex data))
              (l (stringy-length cs)))
             (if l
-               (lets 
+               (lets
                   ((rs cs (string-mutate rs cs l))
                    (rs d (rand-delta-up rs)))
-                  (values ascii-bad rs 
+                  (values ascii-bad rs
                      (flush-bvecs (string-unlex cs) (cdr ll))
                      (inc meta 'ab-string) d))
                (values ascii-bad rs ll meta -1))))
 
-   
+
       ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
       ; [i]nsert
@@ -1065,7 +1064,7 @@
             ;(tuple "str"  sed-str "try to modify a string")
             ;(tuple "word" sed-word "try to play with what look like n-byte words or values")
             (tuple "xp"    xp-mutate "try to parse XML and mutate it")
-         
+
             ;; crlf, whitspace confusion (^L, space, tab, \n->\r\n, \r)
             ;; lists
 
@@ -1075,7 +1074,7 @@
             (tuple "ft" sed-fuse-this "jump to a similar position in block")
             (tuple "fn" sed-fuse-next "likely clone data between similar positions")
             (tuple "fo" sed-fuse-old "fuse previously seen data elsewhere")
-            
+
             (tuple "nop" sed-nop "do nothing (debug/test)")
 
             ))
@@ -1098,7 +1097,7 @@
       (define (priority->fuzzer node)
          (cond
             ((not node) #false)
-            ((name->mutation (car node)) => 
+            ((name->mutation (car node)) =>
                (λ (func) (tuple max-score (cdr node) func (car node))))
             (else #false)))
 
@@ -1110,10 +1109,10 @@
 
       ;; rs pris → rs' pris'
       (define (weighted-permutation rs pris)
-         ;; show a sorted probability distribution 
+         ;; show a sorted probability distribution
          (stderr-probe
             (sort car> (map (λ (x) (cons (ref x 1) (ref x 4))) pris))
-            (lets    
+            (lets
                ((rs ppris ; ((x . (pri . fn)) ...)
                   (fold-map
                      (λ (rs node)
@@ -1125,7 +1124,7 @@
                 (ppris (sort car> ppris)))
                (values rs (map cdr (sort car> ppris))))))
 
-      ;; Mutators have a score they can change themselves (1-100) and a priority given by 
+      ;; Mutators have a score they can change themselves (1-100) and a priority given by
       ;; the user at command line. Activation probability is (score*priority)/SUM(total-scores).
 
       ;; (#(score priority mutafn name) ...) → merged-mutafn :: rs ll meta → merged-mutafn' rs' ll' meta'
@@ -1141,7 +1140,7 @@
                               (lets
                                  ((node (car pfs))
                                   (mscore mpri ╯°□°╯ mname node)
-                                  (mfn rs mll mmeta delta 
+                                  (mfn rs mll mmeta delta
                                     (╯°□°╯ rs ll meta))
                                   (out ;; always remember whatever was learned
                                     (cons (tuple (adjust-priority mscore delta) mpri mfn mname) out)))
@@ -1153,28 +1152,31 @@
                                        (values (mux-fuzzers (append out (cdr pfs))) rs mll mmeta))))))))
                   ((null? ll)
                      (values (mux-fuzzers fs) rs ll meta))
-                  (else 
+                  (else
                      (loop (ll)))))))
 
-      ;; randomize mutator scores 
+      ;; randomize mutator scores
       (define (mutators->mutator rs mutas)
          (let loop ((rs rs) (mutas mutas) (out null))
             (if (null? mutas)
-               (stderr-probe  
-                  (map 
+               (stderr-probe
+                  (map
                      (λ (node) (list (ref node 4) 'score (ref node 1) 'pri (ref node 2)))
                      (sort (λ (a b) (> (* (ref a 1) (ref a 2)) (* (ref b 1) (ref b 2)))) out))
                   (values rs (mux-fuzzers out)))
                (lets ((rs n (rand rs max-score)))
                   (loop rs (cdr mutas) (cons (set (car mutas) 1 (max 2 n)) out))))))
 
+      (define cut-= (string->regex "c/=/"))
+      (define cut-comma (string->regex "c/,/"))
+
       ;; str → (mutator-node ...) | #f, parse cmdline arg but no randomization yet (seed may not be known)
       (define (string->mutators str)
          (lets
-            ((ps (map c/=/ (c/,/ str))) ; ((name [priority-str]) ..)
+            ((ps (map cut-= (cut-comma str))) ; ((name [priority-str]) ..)
              (ps (map selection->priority ps))
              (fs (map priority->fuzzer ps)))
-            (if (every self fs) 
+            (if (every self fs)
                fs
                #false)))
 

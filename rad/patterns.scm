@@ -99,9 +99,12 @@
                (lets ((rs n (rand rs n)))
                   ((choose-pri ps n) rs ll muta meta)))))
 
+      (define cut-= (string->regex "c/=/"))
+      (define cut-comma (string->regex "c/,/"))
+
       (define (string->patterns str)
          (lets
-            ((ps (map c/=/ (c/,/ str))) ; ((name [priority-str]) ..)
+            ((ps (map cut-= (cut-comma str))) ; ((name [priority-str]) ..)
              (ps (map selection->priority ps))
              (ps (map priority->pattern ps)))
             (if (every self ps)
