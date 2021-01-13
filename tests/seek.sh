@@ -2,7 +2,7 @@
 
 set -e
 
-SEED=$RANDOM
+SEED=$(bin/ol -e '(expt (time-ms) 2)')
 
 echo "HAL 9000" | $@ --seed $SEED -o tmp/seek-1-%n -n 20
 echo "HAL 9000" | $@ --seed $SEED -o tmp/seek-2-%n --seek 19 -n 2
