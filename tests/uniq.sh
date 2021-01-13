@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 set -e
 echo "HAL 9000" | $@ -o tmp/uniq-%n -n 100 -p od -m num 
