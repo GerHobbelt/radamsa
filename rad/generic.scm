@@ -5,7 +5,7 @@
 (define-library (rad generic)
 
    (import
-      (owl base)
+      (owl toplevel)
       (rad fuse))
 
    (export

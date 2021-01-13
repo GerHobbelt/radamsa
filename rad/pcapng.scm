@@ -3,7 +3,7 @@
   (import
     (owl list-extra)
     (scheme base)
-    (owl base)
+    (owl toplevel)
     (owl lazy))
 
   (export

@@ -5,10 +5,9 @@
 (define-library (rad output)
 
    (import
-      (owl base)
+      (owl toplevel)
       (owl iff)
       (owl io)
-      (only (owl primop) halt)
       (rad digest)
       (rad shared))
 
@@ -256,7 +255,7 @@
                (values
                   (tcp-server ll port)
                   fd
-                  (-> meta
+                  (pipe meta
                      (put 'port port)
                      (put 'output 'tcp-server)
                      (put 'ip (ip->string ip)))))))
@@ -273,7 +272,7 @@
                (let loop ()
                   (λ (meta)
                      (values (loop) node
-                        (-> meta
+                        (pipe meta
                            (put 'port port)
                            (put 'output 'udp-client)
                            (put 'ip ip)))))

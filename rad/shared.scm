@@ -5,7 +5,7 @@
 
 (define-library (rad shared)
 
-   (import (owl base))
+   (import (owl toplevel))
 
    (export
       max-block-size

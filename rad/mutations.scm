@@ -8,7 +8,7 @@
 (define-library (rad mutations)
 
    (import
-      (owl base)
+      (owl toplevel)
       (rad generic)   ;; shared list mutations
       (rad split)     ;; heuristic splitting
       (rad xp)        ;; xmlish parsing and mutations

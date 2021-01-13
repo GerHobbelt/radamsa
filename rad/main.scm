@@ -7,9 +7,9 @@
 (define-library (rad main)
 
    (import
-      (owl base)
+      (owl toplevel)
       (owl args)
-      (owl sys)
+      (except (owl sys) pipe)
       (rad generators)
       (rad output)
       (rad digest)
@@ -282,8 +282,9 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                               ((out fd meta (out meta))
                                (rs muta generation-meta n-written
                                  (output out-lst fd))
+
                                (meta
-                                  (-> (ff-union meta generation-meta K)
+                                  (pipe (ff-union meta generation-meta K)
                                      (put 'length n-written))))
                               (record-meta meta)
                               (sleeper)

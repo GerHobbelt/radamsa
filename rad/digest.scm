@@ -3,9 +3,9 @@
 (define-library (rad digest)
 
    (import
-      (owl base)
+      (owl toplevel)
       (owl lazy)
-      (owl codec)
+      (lib hex core)
       (owl digest)) ;; sha256-raw ll → (fixnum ...)
 
    (export

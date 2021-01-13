@@ -8,11 +8,10 @@
 (define-library (rad generators)
 
    (import
-      (owl base)
+      (owl toplevel)
       (owl sys)
       (rad shared)
       (rad fuse)
-      (only (owl primop) halt)
       (rad pcapng))
 
    (export

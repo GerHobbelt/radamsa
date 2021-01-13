@@ -7,7 +7,7 @@
    (export fuse)
 
    (import
-      (owl base))
+      (owl toplevel))
 
    (begin
 

@@ -8,7 +8,7 @@
       xp-mutate)
 
    (import
-      (owl base)
+      (owl toplevel)
       (rad shared)
       (prefix (owl parse) get-))
 

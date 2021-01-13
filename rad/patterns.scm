@@ -5,7 +5,7 @@
 (define-library (rad patterns)
 
    (import
-      (owl base)
+      (owl toplevel)
       (rad shared)
       (rad pcapng))
 

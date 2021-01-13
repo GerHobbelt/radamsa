@@ -32,7 +32,7 @@
 (define-library (rad split)
 
    (import
-      (owl base))
+      (owl toplevel))
 
    (export
       split-lense)
