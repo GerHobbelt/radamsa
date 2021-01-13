@@ -19,9 +19,12 @@ bin/radamsa: radamsa.c
 	mkdir -p bin
 	$(CC) $(CFLAGS) $(LDFLAGS) -o bin/radamsa radamsa.c
 
-radamsa.c: rad/*.scm
+radamsa.c: rad/*.scm lib/hex
 	test -x bin/ol || make bin/ol
 	bin/ol $(OFLAGS) -o radamsa.c rad/main.scm
+
+lib/hex:
+	cd lib && git clone https://gitlab.com/owl-lisp/hex
 
 radamsa.fasl: rad/*.scm bin/ol
 	bin/ol -o radamsa.fasl rad/main.scm
@@ -46,6 +49,7 @@ clean:
 
 mrproper: clean
 	-rm -rf ol.*
+	-rm -rf lib/hex
 
 test: .seal-of-quality
 
