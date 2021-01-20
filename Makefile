@@ -25,7 +25,7 @@ radamsa.c: rad/*.scm lib/hex
 
 lib/hex:
 	mkdir -p lib
-	cd lib && git clone https://gitlab.com/owl-lisp/hex
+	cd lib && git clone https://gitlab.com/owl-lisp/hex.git
 
 radamsa.fasl: rad/*.scm bin/ol
 	bin/ol -o radamsa.fasl rad/main.scm
