@@ -56,8 +56,6 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                i
                #false)))
 
-
-
       (define command-line-rules
          (cl-rules
             `((help "-h" "--help" comment "show this thing")
@@ -92,6 +90,8 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                     comment "maximum number of checksums in uniqueness filter (0 disables)")
               (hash "-H" "--hash" cook ,string->hash default "stream"
                     comment "hash algorithm for uniqueness checks (stream, sha1 or sha256)")
+              (output-template-string #f "--output-template" has-arg
+                    comment "Output template. %f is fuzzed data. e.g. \"<html>%f</html>\"")
               (verbose "-v" "--verbose" comment "show progress during generation"))))
 
       ;; () → string
@@ -228,11 +228,33 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
 
       (define K (λ (a b) a))
 
-      ;; todo: separate generation steps properly
+      (define template-prelude (string->regex "s/%f.*//"))
+      (define template-finale (string->regex "s/.*%f//"))
+
+      ;; currently assumes just one occurrence of %f
+      (define (string->template-filler template)
+         (let ((pre (list->bytevector (string->bytes (template-prelude template))))
+               (post (list->bytevector (string->bytes (template-finale template)))))
+            (lambda (data)
+               ;; data comes from fuzzed data generationg, so it's a list of byte vectors
+               ;; followed by a tuple having metadata regarding the generation.
+               (cons pre
+                  (foldr
+                     (lambda (x tl)
+                        (if (null? tl)
+                           (list post x)
+                           (cons x tl)))
+                     null data)))))
+
       (define (run-radamsa dict paths)
          (lets/cc ret
             ((fail (λ (why) (print why) (ret 1)))
              (rs (seed->rands (get dict 'seed)))
+             (templater
+                ;; precendence: template string > template file > "%f"
+                (string->template-filler
+                   (or (get dict 'output-template-string #f)
+                       "%f")))
              (record-meta
                (maybe-meta-logger
                   (get dict 'metadata)
@@ -271,9 +293,9 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                    0)
                 (else
                   (lets
-                     ((rs ll meta (gen rs))
+                     ((rs ll meta (gen rs))    ;; get a sample data stream
                       (meta (put meta 'nth p))
-                      (out-ll (pat rs ll muta meta))
+                      (out-ll (pat rs ll muta meta)) ; apply mutator with pattern
                       (out-lst cs csum (checksummer cs out-ll))
                       (meta (put meta 'checksum (or csum "blank"))))
                      (if csum
@@ -281,7 +303,7 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                            (lets
                               ((out fd meta (out meta))
                                (rs muta generation-meta n-written
-                                 (output out-lst fd))
+                                 (output (templater out-lst) fd))
 
                                (meta
                                   (pipe (ff-union meta generation-meta K)
