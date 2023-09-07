@@ -19,6 +19,67 @@
       (define null '())
 
       (define max-burst-mutations 16)
+      (define max-mutation-retries 24)
+
+      ;; check that byte vector bv from position bvp matches byte vector x from xp
+      ;; if they do (exactly), return #true
+      ;; if they don't, return #false
+      ;; if x contains a prefix of bvp, return the corresponding position of bvec
+      (define (walk-bytes bv bvp x xp)
+         (let ((val (ref bv bvp)))
+            (if val
+               (let ((xval (ref x xp)))
+                  (cond
+                     ((eq? val xval)
+                        (walk-bytes bv (+ bvp 1) x (+ xp 1)))
+                     ((not xval)
+                        ;; continues in the next block
+                        bvp)
+                     (else
+                        ;; no match
+                        #false)))
+               (not (ref x xp))))) ;; xp should end too
+
+      ;; note: need to change also tails
+      ;; like equal?, but we want to make (#(1 2) #(3 4) ...) = (#(1 2 3 4) ...)
+      (define (tail-after bvec lst)
+         (let loop ((pos 0) (lst lst))
+            (cond
+               ((not (pair? lst))
+                  ;; out of data
+                  #f)
+               ((walk-bytes bvec pos (car lst) 0)
+                  => (lambda (pos)
+                        (if (eq? pos #true)
+                           (begin
+                              ;(print "These were equal!")
+                              (cdr lst))
+                           (begin
+                              ;(print "Prefix matched resuming " bvec " from pos " pos " against " (cdr lst))
+                              (loop pos (cdr lst))))))
+               (else
+                  #false))))
+
+      (define (changes-occurred? orig new)
+         (let ((tail (tail-after (car orig) new)))
+            (if tail
+               (not (equal? (cdr orig) tail))
+               #t)))
+
+      (define (force-change mutator rs ll meta n)
+         (lets ((mutatorp rsp llp metap (mutator rs ll meta)))
+            (cond
+               ;; this is kind of like (not (equal? ll llp)), but we want to allow the
+               ;; *first* byte vector of ll to become partitioned into separate ones at
+               ;; the beginning of llp
+               ((changes-occurred? ll llp)
+                  (values mutatorp rsp llp
+                     (put metap 'remutated n)))
+               ((eq? n 0)
+                  (values mutatorp rsp llp
+                     (put metap 'remutate-failed max-mutation-retries)))
+               (else
+                  (force-change mutator rsp llp meta (- n 1))))))
 
       (define (mutate-once rs ll mutator meta cont)
          (lets
@@ -35,7 +96,7 @@
                                      (pcapng-block-to-mutate? this)))
                            (lets
                               ((ll (cons this ll))
-                               (mutator rs ll meta (mutator rs ll meta)))
+                               (mutator rs ll meta (force-change mutator rs ll meta max-mutation-retries)))
                               (cont ll rs mutator meta))
                            ;; keep moving
                            (if (null? ll)
@@ -70,7 +131,7 @@
                   (lets ((rs p (rand-occurs? rs remutate-probability)))
                      (if (or p (< n 2))
                         ;; note, the ll is pre-evaluated because we already mutated it
-                        (lets ((mutator rs ll meta (mutator rs ll meta)))
+                        (lets ((mutator rs ll meta (force-change mutator rs ll meta max-mutation-retries)))
                            (loop rs ll mutator meta (+ n 1)))
                         (lappend ll (list (tuple rs mutator meta)))))))))
 
