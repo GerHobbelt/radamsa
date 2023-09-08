@@ -67,19 +67,21 @@
                #t)))
 
       (define (force-change mutator rs ll meta n)
-         (lets ((mutatorp rsp llp metap (mutator rs ll meta)))
-            (cond
-               ;; this is kind of like (not (equal? ll llp)), but we want to allow the
-               ;; *first* byte vector of ll to become partitioned into separate ones at
-               ;; the beginning of llp
-               ((changes-occurred? ll llp)
-                  (values mutatorp rsp llp
-                     (put metap 'remutated n)))
-               ((eq? n 0)
-                  (values mutatorp rsp llp
-                     (put metap 'remutate-failed max-mutation-retries)))
-               (else
-                  (force-change mutator rsp llp meta (- n 1))))))
+         (if (pair? ll)
+            (lets ((mutatorp rsp llp metap (mutator rs ll meta)))
+               (cond
+                  ;; this is kind of like (not (equal? ll llp)), but we want to allow the
+                  ;; *first* byte vector of ll to become partitioned into separate ones at
+                  ;; the beginning of llp
+                  ((changes-occurred? ll llp)
+                     (values mutatorp rsp llp
+                        (put metap 'remutated n)))
+                  ((eq? n 0)
+                     (values mutatorp rsp llp
+                        (put metap 'remutate-failed max-mutation-retries)))
+                  (else
+                     (force-change mutator rsp llp meta (- n 1)))))
+            (force-change mutator rs (list (vector)) meta n)))
 
       (define (mutate-once rs ll mutator meta cont)
          (lets

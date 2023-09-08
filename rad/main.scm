@@ -37,7 +37,7 @@
                      #false)))
             (else #f)))
 
-      (define version-str "Radamsa 0.6")
+      (define version-str "Radamsa 0.7a")
 
       (define usage-text "Usage: radamsa [arguments] [file ...]")
 
