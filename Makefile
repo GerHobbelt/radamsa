@@ -80,16 +80,17 @@ future:
 	make
 
 autofuzz: bin/radamsa
+	mkdir -p tmp
 	echo '<html> <foo bar=baz>zeb</foo> <foo babar=lol></html>' > tmp/test.xmlish
 	cp radamsa.c tmp/test.c
 	cp /bin/sh tmp/test.bin
 	echo "HAL 9000" > tmp/test.small
 	# create sample data in 3 rounds
-	bin/radamsa --seed 1 -o tmp/test.%n -n 100 rad/* bin/* tmp/test.*
-	bin/radamsa --seed 2 -o tmp/test.2.%n -n 100 rad/* bin/* tmp/test.*
-	bin/radamsa --seed 3 -o tmp/test.3.%n -n 100 rad/* bin/* tmp/test.*
+	bin/radamsa -o tmp/test.%n -n 100 rad/* bin/* tmp/test.*
+	bin/radamsa -o tmp/test.2.%n -n 100 rad/* bin/* tmp/test.*
+	bin/radamsa -o tmp/test.3.%n -n 100 rad/* bin/* tmp/test.*
 	# fuzz 100k
-	bin/radamsa --seed 42 -v -n 100000 tmp/test.* > /dev/null
+	bin/radamsa -v --meta autofuzz.log -n 100000 tmp/test.* > /dev/null
 	echo autofuzz success
 
 
