@@ -4,7 +4,7 @@ BINDIR=/bin
 CFLAGS?=-Wall -O3
 LDFLAGS?=
 OFLAGS=-O1
-OWLURL=https://haltp.org/files/ol-0.2.c.gz
+OWLURL=https://haltp.org/files/ol-0.2.2.c.gz
 USR_BIN_OL?=/usr/bin/ol
 
 everything: bin/radamsa
@@ -81,12 +81,16 @@ future:
 
 autofuzz: bin/radamsa
 	echo '<html> <foo bar=baz>zeb</foo> <foo babar=lol></html>' > tmp/test.xmlish
-	bin/radamsa -v -o tmp/out-%n -n 200 rad/* bin/* tmp/test.xmlish
-	bin/radamsa -v -o tmp/out-2-%n -n 200 tmp/out-* tmp/test.xmlish
-	bin/radamsa -v -o tmp/out-3-%n -n 200 tmp/out-2-* tmp/test.xmlish
-	# fuzz a million outputs
-	bin/radamsa --seed 42 --meta million.meta -n 1000000
-	echo autofuzz complete
+	cp radamsa.c tmp/test.c
+	cp /bin/sh tmp/test.bin
+	echo "HAL 9000" > tmp/test.small
+	# create sample data in 3 rounds
+	bin/radamsa --seed 1 -o tmp/test.%n -n 100 rad/* bin/* tmp/test.*
+	bin/radamsa --seed 2 -o tmp/test.2.%n -n 100 rad/* bin/* tmp/test.*
+	bin/radamsa --seed 3 -o tmp/test.3.%n -n 100 rad/* bin/* tmp/test.*
+	# fuzz 100k
+	bin/radamsa --seed 42 -v -n 100000 tmp/test.* > /dev/null
+	echo autofuzz success
 
 
 ## Library mode test
