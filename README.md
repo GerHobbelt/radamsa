@@ -1,6 +1,25 @@
 # A Crash Course to Radamsa
 
-Radamsa is a test case generator for robustness testing, a.k.a. a fuzzer. It is typically used to test how well a program can withstand malformed and potentially malicious inputs. It works by reading sample files of valid data and generating interestringly different outputs from them. The main selling points of radamsa are that it has already found a slew of bugs in programs that actually matter, it is easily scriptable and, easy to get up and running.
+Radamsa is a test case generator for robustness testing, a.k.a. a fuzzer. It is typically used to test how well a program can withstand malformed and potentially malicious inputs. It works by reading sample files of valid data and generating interestingly different outputs from them. The main selling points of radamsa are that it has already found a slew of bugs in programs that actually matter, it is easily scriptable and easy to get up and running.
+
+# Table of contents
+
+<!--ts-->
+   * [A Crash Course to Radamsa](#a-crash-course-to-radamsa)
+   * [Table of contents](#table-of-contents)
+   * [Nutshell:](#nutshell)
+   * [What the Fuzz](#what-the-fuzz)
+   * [Requirements](#requirements)
+   * [Building Radamsa](#building-radamsa)
+   * [Fuzzing with Radamsa](#fuzzing-with-radamsa)
+   * [Output Options](#output-options)
+   * [Related Tools](#related-tools)
+   * [Some Known Results](#some-known-results)
+   * [Thanks](#thanks)
+   * [Troubleshooting](#troubleshooting)
+   * [FAQ](#faq)
+   * [Warnings](#warnings)
+<!--te-->
 
 ## Nutshell:
 
@@ -298,7 +317,7 @@ CVE-2017-9843 | SAP NETWEAVER | @vah_13 (ERPScan)
 CVE-2017-9845 | SAP NETWEAVER | @vah_13 (ERPScan)
 [CVE-2018-0101](https://www.nccgroup.trust/globalassets/newsroom/uk/events/offensivecon2018-the-return-of-robin-hood-vs-cisco-asa.pdf) | Cisco ASA WebVPN/AnyConnect | @saidelike (NCC Group)
 
-We would like to thank the Chromium project and Mozilla for analyzing, fixing and reporting further many of the above mentioned issues, CERT-FI for feedback and disclosure handling, and other users, projects and vendors who have responsibly taken care of uncovered bugs.
+We would like to thank the Chromium project and Mozilla for analyzing, fixing and reporting many issues mentioned above, CERT-FI for feedback and disclosure handling, and other users, projects and vendors who have responsibly taken care of uncovered bugs.
 
 ## Thanks
 
@@ -329,13 +348,13 @@ A: No. The intention is to keep it simple and scriptable for use in automated re
 Q: I can't install! I don't have root access on the machine!  
 A: You can omit the $ make install part and just run radamsa from bin/radamsa in the build directory, or copy it somewhere else and use from there.
 
-Q: Radamsa takes several GB of memory to compile!1  
+Q: Radamsa takes several GB of memory to compile!  
 A: This is most likely due to an issue with your C compiler. Use prebuilt images or try the quick build instructions in this page.
 
 Q: Radamsa does not compile using the instructions in this page!  
 A: Please file an issue at https://gitlab.com/akihe/radamsa/issues if you don't see a similar one already filed, send email (aohelin@gmail.com) or IRC (#radamsa on freenode).
 
-Q: I used fuzzer X and found much more bugs from program Y than Radamsa did.  
+Q: I used fuzzer X and found significantly more bugs in program Y than Radamsa did.  
 A: Cool. Let me know about it (aohelin@gmail.com) and I'll try to hack something X-ish to radamsa if it's general purpose enough. It'd also be useful to get some samples which you used to check how well radamsa does, because it might be overfitting some heuristic.
 
 Q: Can I get support for using radamsa?  
