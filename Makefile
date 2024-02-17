@@ -1,10 +1,10 @@
 DESTDIR=
 PREFIX=/usr
 BINDIR=/bin
-CFLAGS?=-Wall -O2
+CFLAGS?=-Wall -O3
 LDFLAGS?=
-OFLAGS=-O2
-OWLURL=https://gitlab.com/owl-lisp/owl/uploads/38d13ea55860be90b8c0a4519810c6d5/ol-0.1.20.c.gz
+OFLAGS=-O1
+OWLURL=https://haltp.org/files/ol-0.2.2.c.gz
 USR_BIN_OL?=/usr/bin/ol
 
 everything: bin/radamsa
@@ -19,9 +19,13 @@ bin/radamsa: radamsa.c
 	mkdir -p bin
 	$(CC) $(CFLAGS) $(LDFLAGS) -o bin/radamsa radamsa.c
 
-radamsa.c: rad/*.scm
+radamsa.c: rad/*.scm lib/hex
 	test -x bin/ol || make bin/ol
 	bin/ol $(OFLAGS) -o radamsa.c rad/main.scm
+
+lib/hex:
+	mkdir -p lib
+	cd lib && git clone https://gitlab.com/owl-lisp/hex.git
 
 radamsa.fasl: rad/*.scm bin/ol
 	bin/ol -o radamsa.fasl rad/main.scm
@@ -32,7 +36,7 @@ ol.c:
 
 bin/ol: ol.c
 	mkdir -p bin
-	cc -O2 -o bin/ol ol.c
+	cc $(CFLAGS) -o bin/ol ol.c
 
 install: bin/radamsa
 	-mkdir -p $(DESTDIR)$(PREFIX)/bin
@@ -41,13 +45,12 @@ install: bin/radamsa
 	cat doc/radamsa.1 | gzip -9 > $(DESTDIR)$(PREFIX)/share/man/man1/radamsa.1.gz
 
 clean:
-	-rm -rf owl-lisp
-	-rm radamsa.c bin/radamsa .seal-of-quality
-	-rm bin/ol ol.c.gz ol.c
+	-rm -f radamsa.c c/libradamsa.c lib/libradamsa.a lib/libradamsa.so bin/radamsa .seal-of-quality
+	-rm -f bin/ol
 
 mrproper: clean
-	-rm -rf ol-*
-	-rm -rf owl
+	-rm -rf ol.*
+	-rm -rf lib/hex
 
 test: .seal-of-quality
 
@@ -59,16 +62,9 @@ fasltest: radamsa.fasl
 	sh tests/run bin/radamsa
 	touch .seal-of-quality
 
-# standalone build for shipping
-standalone:
-	-rm radamsa.c # likely old version
-	make radamsa.c
-	# compile without seccomp and use of syscall
-	diet gcc -DNO_SECCOMP -O3 -Wall -o bin/radamsa radamsa.c
-
 # a quick to compile vanilla bytecode executable
 bytecode: bin/ol
-	bin/ol -O0 -x c -o - rad/main.scm | $(CC) -O2 -x c -o bin/radamsa -
+	bin/ol -O0 -x c -o - rad/main.scm | $(CC) $(CFLAGS) -x c -o bin/radamsa -
 	-mkdir -p tmp
 	sh tests/run bin/radamsa
 
@@ -84,32 +80,46 @@ future:
 	make
 
 autofuzz: bin/radamsa
+	mkdir -p tmp
 	echo '<html> <foo bar=baz>zeb</foo> <foo babar=lol></html>' > tmp/test.xmlish
-	bin/radamsa -v -o tmp/out-%n -n 200 rad/* bin/* tmp/test.xmlish
-	bin/radamsa -v -o tmp/out-2-%n -n 200 tmp/out-* tmp/test.xmlish
-	bin/radamsa -v -o tmp/out-3-%n -n 200 tmp/out-2-* tmp/test.xmlish
-	# fuzz a million outputs 
-	bin/radamsa --seed 42 --meta million.meta -n 1000000
-	echo autofuzz complete
+	cp radamsa.c tmp/test.c
+	cp /bin/sh tmp/test.bin
+	echo "HAL 9000" > tmp/test.small
+	# create sample data in 3 rounds
+	bin/radamsa -o tmp/test.%n -n 100 rad/* bin/* tmp/test.*
+	bin/radamsa -o tmp/test.2.%n -n 100 rad/* bin/* tmp/test.*
+	bin/radamsa -o tmp/test.3.%n -n 100 rad/* bin/* tmp/test.*
+	# fuzz 100k
+	bin/radamsa -v --meta autofuzz.log -n 100000 tmp/test.* > /dev/null
+	echo autofuzz success
 
 
 ## Library mode test
 
 c/libradamsa.c: bin/ol c/lib.c rad/*.scm
-	bin/ol -O1 --mode library -o c/libradamsa.c rad/libradamsa.scm
+	bin/ol $(OFLAGS) --mode library -o c/libradamsa.c rad/libradamsa.scm
 	sed -i 's/int main/int secondary/' c/libradamsa.c
 	cat c/lib.c >> c/libradamsa.c
 
-lib/libradamsa.a: c/libradamsa.c
+lib/libradamsa.o: c/libradamsa.c
 	mkdir -p lib
-	cc -O2 -I c -o lib/libradamsa.a -c c/libradamsa.c
+	cc $(CFLAGS) -I c -o lib/libradamsa.o -c c/libradamsa.c
 
-bin/libradamsa-test: lib/libradamsa.a c/libradamsa-test.c
+lib/libradamsa.a: lib/libradamsa.o
+	ar crs lib/libradamsa.a lib/libradamsa.o
+
+lib/libradamsa.so: c/libradamsa.c
+	mkdir -p lib
+	# temporary hack
+	sed -i -e '/radamsa\.h/d' c/libradamsa.c
+	cc -shared $(CFLAGS) c/libradamsa.c -o lib/libradamsa.so -fPIC
+
+bin/libradamsa-test: lib/libradamsa.so c/libradamsa-test.c
 	mkdir -p tmp
-	cc -O2 -Ic -o bin/libradamsa-test c/libradamsa-test.c -Llib -lradamsa
+	cc $(CFLAGS) -Ic -o bin/libradamsa-test c/libradamsa-test.c -Llib -lradamsa
 
 libradamsa-test: bin/libradamsa-test
-	bin/libradamsa-test c/lib.c | grep "library test passed"
+	LD_LIBRARY_PATH=lib:$(LD_LIBRARY_PATH) DYLD_LIBRARY_PATH=lib:$(DYLD_LIBRARY_PATH) bin/libradamsa-test c/lib.c | grep "library test passed"
 
 
 ## Cleanup and Meta

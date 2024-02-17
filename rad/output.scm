@@ -5,10 +5,9 @@
 (define-library (rad output)
 
    (import
-      (owl base)
+      (owl toplevel)
       (owl iff)
       (owl io)
-      (only (owl primop) halt)
       (rad digest)
       (rad shared))
 
@@ -20,12 +19,12 @@
       string->outputs)    ;; str num → ll of output functions | #false
 
    (begin
-      
+
       (define null '())
-      
+
       ;; output :: (ll' ++ (#(rs mutator meta))) fd → rs mutator meta (n-written | #f), handles port closing &/| flushing
       (define (output-to-fd ll fd)
-         (lets 
+         (lets
             ((ll n (blocks->port ll fd))
              (ok? (and (pair? ll) (tuple? (car ll)))) ;; all written?
              (lst (force-ll ll))
@@ -39,12 +38,12 @@
       (define (output ll x)
          (tuple-case x
             ((udp ip port sock)
-               (lets 
+               (lets
                   ((rlst (reverse (force-ll ll)))
                    (state (car rlst))
                    ;(real-data (foldr append null (map vector->list (keep vector? (force-ll ll)))))
                    (len (foldr + 0 (map vector-length (cdr rlst))))
-                   (data 
+                   (data
                       (fold ;; left to right fold, because reverse
                          (λ (tail block)
                             (vec-foldr cons tail block))
@@ -57,15 +56,15 @@
                      (lets ((buffer (list->bytevector data)))
                         (cond
                            ((send-udp-packet sock ip port buffer)
-                              (values rs muta meta 
+                              (values rs muta meta
                                  (vector-length buffer)))
                            (else
                               ;; likely packet size exceeded, so log it as a negative number for debugging
-                              (values rs muta meta 
+                              (values rs muta meta
                                  (- 0 (vector-length buffer)))))))))
             (else
                (output-to-fd ll x))))
-            
+
       ;; compute and discard (for fast forwardng)
       (define (dummy-output ll)
         (lets
@@ -81,7 +80,7 @@
                   (cons (ref buff pos) tail)))))
 
       (define (output-stream->byte-stream lst)
-         (foldr 
+         (foldr
             (lambda (node tl)
                (if (vector? node)
                   (lambda ()
@@ -95,8 +94,8 @@
       ;;;
       ;;; Checksum computing and uniqueness filtering
       ;;;
-   
-      ;; force all and compute payload checksum 
+
+      ;; force all and compute payload checksum
       ;; ll -> forced-ll checksum
       (define (checksummer hash)
          (λ (cs ll)
@@ -107,21 +106,21 @@
                (if (dget cs csum-trits)
                   (values lst cs #false)
                   (values lst (dput cs csum-trits) csum-string)))))
-      
+
       (define (byte-list-checksummer hash)
          (λ (cs lst)
             (lets ((csum-trits csum-string (hash lst)))
                (if (dget cs csum-trits)
                   (values lst cs #false)
                   (values lst (dput cs csum-trits) csum-string)))))
-      
+
       ;; dummy checksum, does not not force stream
       (define (dummy-checksummer hash)
          (λ (cs ll)
             (values ll cs "n/a")))
 
       (define (stdout-stream meta)
-         (values stdout-stream stdout 
+         (values stdout-stream stdout
             (put meta 'output 'stdout)))
 
       (define (get-natural ll)
@@ -138,10 +137,10 @@
       (define default-path ".rad")
       (define default-suffix (cdr (string->list default-path)))
 
-      (define (suffix-char? x) 
+      (define (suffix-char? x)
         (not (memq x '(#\. #\/ #\\))))
 
-      (define (path-suffix path default) 
+      (define (path-suffix path default)
         (lets ((hd tl (take-while suffix-char? (reverse (string->list path)))))
           (if (and (pair? tl) (eq? (car tl) #\.))
             (reverse hd)
@@ -149,12 +148,12 @@
 
       (define (source-path meta def)
         (or (get meta 'source #false) ;; file generator
-            (get meta 'head #false)   ;; jump generator (head -> tail) 
+            (get meta 'head #false)   ;; jump generator (head -> tail)
             def))
 
       (define (file-writer pat suf)
          (define (gen meta)
-            (lets 
+            (lets
                ((path
                   (runes->string
                      (str-foldr
@@ -165,6 +164,7 @@
                               ((and (eq? char #\%) (pair? tl))
                                  (case (car tl)
                                     ((#\n) (render (get meta 'nth 0) (cdr tl)))
+                                    ((#\h) (render (get meta 'checksum "blank") (cdr tl)))
                                     ((#\s) (append (path-suffix (source-path meta default-path) default-path) (cdr tl)))
                                     ((#\p) (append suf (cdr tl)))
                                     ((#\0) ;; %0[0-9]+n -> testcase number with padding
@@ -174,7 +174,7 @@
                                           (if (and pad (equal? np #\n))
                                              (lets
                                                 ((digits (render (get meta 'nth 0) null))
-                                                 (padding 
+                                                 (padding
                                                    (map (λ (x) #\0)
                                                       (iota 0 1 (- pad (length digits)))))
                                                  (chars (append padding digits))
@@ -185,11 +185,11 @@
                                                 (print*-to stderr
                                                    (list "Warning: testcase padding should be %0[0-9]+n"))
                                                 (cons char tl)))))
-                                    (else 
+                                    (else
                                        (print*-to stderr
-                                          (list "Warning: unknown pattern in output path: '" 
+                                          (list "Warning: unknown pattern in output path: '"
                                              (list->string (list char (car tl)))
-                                             "'. Did you mean '%n, %s or %p'?"))
+                                             "'. Did you mean '%n, %s, %h or %p'?"))
                                        (cons char tl))))
                               (else (cons char tl))))
                         null pat)))
@@ -222,7 +222,7 @@
                (let loop ((n 1)) ;; try to connect repeatedly
                   (let ((fd (open-connection ip port)))
                      (if fd
-                        (values 
+                        (values
                            gen
                            fd
                            (put (put (put meta 'output 'tcp-client) 'ip ips) 'port port))
@@ -255,41 +255,59 @@
                (values
                   (tcp-server ll port)
                   fd
-                  (-> meta
+                  (pipe meta
                      (put 'port port)
                      (put 'output 'tcp-server)
                      (put 'ip (ip->string ip)))))))
 
-      ;;; 
+      ;;;
       ;;; UDP client
-      ;;; 
+      ;;;
 
       (define (make-udp-client ip port)
-         (lets 
+         (lets
             ((sock (open-udp-socket 0))
              (node (tuple 'udp ip port sock)))
             (if sock
                (let loop ()
                   (λ (meta)
                      (values (loop) node
-                        (-> meta
+                        (pipe meta
                            (put 'port port)
                            (put 'output 'udp-client)
                            (put 'ip ip)))))
                (begin
                   (print-to stderr "Failed to created UDP socket")
                   #false))))
-      
+
+
+      (define drop-protocol (string->regex "s/\\/[a-z]+$//"))
+      (define drop-colon (string->regex "s/://"))
+
+      (define network-server?
+         (string->regex "m/^:[0-9]+(\\/(tcp|udp))?$/"))
+
+      (define network-client?
+         (string->regex "m/^[0-9]{1,3}(\\.[0-9]{1,3}){3}:[0-9]+(\\/(tcp|udp))?$/"))
+
+      (define cut-colon (string->regex "c/:/"))
+      (define cut-point (string->regex "c/\\./"))
+
+      (define counter? (string->regex "m/%(0[1-9][0-9]*)?n/"))
+
+      (define udp? (string->regex "m/udp/"))
+
+      (define hashtag? (string->regex "m/%h/"))
       ;; o n → (out :: → out' fd meta) v null | #false, where os is string from -o, and n is number from -n
-      (define (string->outputs str n suf)
+      (define (string->outputs str n suf hashing-enabled?)
          (cond
             ((equal? str "-") ;; conventional way to ask for standard output (and input)
                stdout-stream)
-            ((m/^:[0-9]+(\/(tcp|udp))?$/ str) ;; server mode network output, currently tcp only
+            ((network-server? str) ;; server mode network output, currently tcp only
                (lets
-                   ((udp? (m/udp/ str))
-                    (str (s/\/[a-z]+$// str)) ;; drop protocol info if there
-                    (port (string->number (s/:// str) 10)))
+                   ((udp? (udp? str))
+                    (str (drop-protocol str))
+                    (port (string->number (drop-colon str) 10)))
                   (cond
                      ((not (and (number? port) (< port 65536)))
                         (print-to stderr "Invalid port: " port)
@@ -305,15 +323,15 @@
                               (begin
                                  (print "Couldn't bind to local port " port)
                                  #false)))))))
-            ((m/^[0-9]{1,3}(\.[0-9]{1,3}){3}:[0-9]+(\/(tcp|udp))?$/ str) ;; client mode network output
+            ((network-client? str) ;; client mode network output
                (lets
-                  ((udp? (m/udp/ str))
-                   (ip+port (c/:/ (s/\/[a-z]+$// str)))
+                  ((udp? (udp? str))
+                   (ip+port (cut-colon (drop-protocol str)))
                    (port (string->number (cadr ip+port) 10))
-                   (ss (c/\./ (car ip+port)))
+                   (ss (cut-point (car ip+port)))
                    (bs (map (λ (x) (string->number x 10)) ss)))
                   (cond
-                     ((not (and (every number? bs) 
+                     ((not (and (every number? bs)
                                 (every (λ (x) (< x 256)) bs)
                                 (number? port)
                                 (< port 65536)))
@@ -325,8 +343,10 @@
                         (make-udp-client (list->vector bs) port))
                      (else
                         (tcp-client (list->vector bs) port)))))
-            ((and (> n 1) (not (m/%(0[1-9][0-9]*)?n/ str)))
-               (print-to stderr "Refusing to overwrite file '" str "' many times. You should add %n or %0[padding]n to the path.")
+            ((and (> n 1)
+                  (not (counter? str))
+                  (not (and hashing-enabled? (hashtag? str))))
+               (print-to stderr "Refusing to overwrite file '" str "' many times. You should add %n, %0[padding]n to the path, or enable hashing and use %h.")
                #false)
             (else
                (file-writer str suf))))

@@ -4,11 +4,11 @@
 
 (define-library (rad xp)
 
-   (export 
+   (export
       xp-mutate)
 
    (import
-      (owl base)
+      (owl toplevel)
       (rad shared)
       (prefix (owl parse) get-))
 
@@ -19,13 +19,13 @@
       ;;;
 
       (define null '())
-      
+
       ; XP = #(bytes (byte ...))       -- nothing interesting structurally
       ;    | #(open name attrs)        -- was <foo attrs>
       ;    | #(open-single name attrs) -- was <foo attrs />
       ;    | #(close name)             -- </foo>
       ;    | #(tag name attrs XP)      -- was <foo attrs> XP </foo>, after shrubbing
-      ;    | #(plus XP1 XP2)           -- XP1 XP2, used in mutations to generate multiple AST nodes 
+      ;    | #(plus XP1 XP2)           -- XP1 XP2, used in mutations to generate multiple AST nodes
 
       ;; convert (... (a . b) ...) → (... a b ...)
       (define (unquote listish)
@@ -43,7 +43,7 @@
 
       (define xp-optwhite
          (get-greedy-star xp-whitespace))
-     
+
       (define xp-string-delim
          (get-one-of
             (get-imm #\")
@@ -58,7 +58,7 @@
                   ((> x 47) (< x 58))  ;; 0-9
                   (else #false)))))
 
-      (define xp-label 
+      (define xp-label
          (get-greedy-plus xp-alnum))
 
       (define (get-quoted-upto delim)
@@ -103,17 +103,17 @@
             ((tag xp-label)
              (attrs (get-greedy-star xp-attr))
              (skip xp-optwhite)
-             (tag-type 
+             (tag-type
                (get-one-of
                   (get-parses ((skip (get-imm #\>))) 'open)
                   (get-parses ((skip (get-imm #\/)) (skip (get-imm #\>))) 'open-single))))
             (tuple tag-type tag attrs)))
 
-      ;; part at < 
+      ;; part at <
       (define xp-tag-open/close
          (get-parses
             ((skip (get-imm #\<))
-             (val 
+             (val
                (get-either
                   (get-parses
                      ((skip (get-imm #\/))
@@ -132,7 +132,7 @@
             (else #true)))
 
       (define xp-uninteresting
-         (get-parses 
+         (get-parses
             ((bs (get-greedy-star (get-byte-if uninteresting?))))
             (tuple 'bytes bs)))
 
@@ -146,10 +146,10 @@
                   (list (tuple 'bytes byte) node)))
             node))
 
-      (define nothing 
+      (define nothing
          (tuple 'bytes null))
 
-      (define xp-parser 
+      (define xp-parser
          (get-greedy-star
             (get-one-of
                xp-tag-open/close
@@ -159,7 +159,7 @@
                   (add this boring)))))
 
       ;; note - this is actually more like a lexer
-      (define (xp-parse lst)  
+      (define (xp-parse lst)
          (get-try-parse xp-parser lst "bug" "bug - everything should be parseable" #false))
 
 
@@ -167,8 +167,8 @@
       ;;; List interning
       ;;;
 
-      ; we want eq?-unique tags and attributes to be able to use them as keys in ff 
-      ; and compare quickly in parser. these are like symbols, but we neither have 
+      ; we want eq?-unique tags and attributes to be able to use them as keys in ff
+      ; and compare quickly in parser. these are like symbols, but we neither have
       ; nor want the symbol interner here.
 
       ;; store = ff of byte → tails, null → bytelist (if any)
@@ -176,17 +176,17 @@
       ;; tree (byte ...) → #false | (byte ...)'
       (define (tree-lookup tree lst)
          (cond
-            ((eq? tree #empty) #false)
+            ((eq? tree empty) #false)
             ((null? lst) (get tree null #false))
-            (else 
-               (tree-lookup (get tree (car lst) #empty) (cdr lst)))))
-   
+            (else
+               (tree-lookup (get tree (car lst) empty) (cdr lst)))))
+
       (define (tree-store tree lst)
          (define (store tree left)
             (if (null? left)
                (put tree null lst)
                (put tree (car left)
-                  (store (get tree (car left) #empty) (cdr left)))))
+                  (store (get tree (car left) empty) (cdr left)))))
          (store tree lst))
 
       (define (intern tree lst)
@@ -205,7 +205,7 @@
       (define (fold2 op st l)
          (if (null? l)
             (values st l)
-            (lets 
+            (lets
                ((st a  (op st (car l)))
                 (st as (fold2 op st (cdr l))))
                (values st (cons a as)))))
@@ -216,7 +216,7 @@
             ((null? node)
                (values tree node))
             ((pair? node)
-               (lets 
+               (lets
                   ((tree a (intern-tags tree (car node)))
                    (tree b (intern-tags tree (cdr node))))
                   (values tree (cons a b))))
@@ -225,13 +225,13 @@
                   ((bytes lst)
                      (values tree node))
                   ((open tag attrs)
-                     (lets 
+                     (lets
                         ((tree tag (intern tree tag))
                          (tree attrs
                             (fold2 (λ (t at) (lets ((t a (intern t (car at)))) (values t (cons a (cdr at))))) tree attrs)))
                         (values tree (tuple 'open tag attrs))))
                   ((open-single tag attrs)
-                     (lets 
+                     (lets
                         ((tree tag (intern tree tag))
                          (tree attrs
                             (fold2 (λ (t at) (lets ((t a (intern t (car at)))) (values t (cons a (cdr at))))) tree attrs)))
@@ -253,7 +253,7 @@
 
       ;; #(bytes A) + #(bytes B) = #(bytes (append A B))
 
-      ;; merge adjecent (bytes ...) nodes 
+      ;; merge adjecent (bytes ...) nodes
       (define (merge-bytes nodes)
          (if nodes
             (foldr
@@ -273,9 +273,9 @@
             nodes)) ;; later this would be a bug in parser
 
 
-      ;;; 
-      ;;; Connecting tag openings to closes 
-      ;;; 
+      ;;;
+      ;;; Connecting tag openings to closes
+      ;;;
 
       ;; reverse-nodes tag → open-tag|#false content-nodes|#false remaining-reverse-nodes|#false
       (define (find-open rnodes tag)
@@ -315,7 +315,7 @@
       ;;;
       ;;; Collecting basic tag info
       ;;;
-   
+
       (define open-only   0) ;; <p>, or just tag opening seen for now
       (define open-single 1) ;; <p />
       (define open-full   2) ;; <foo> ... </foo>
@@ -324,18 +324,20 @@
       ; st is a ff of tag → (tagtype . attrs)
       ; attrs is a ff of attribute → some-seen-value
       (define (add-tag st tag type)
-         (let ((val (getf st tag)))
+         (let ((val (get st tag)))
             (if val
                (if (lesser? type (car val))
                   (put st tag (cons type (cdr val))) ;; update tag type to higher ones (typically 0 -> 2)
                   st)
                (begin
                   ;(print "saw tag " (list->string tag) " for the first time")
-                  (put st tag (cons type #empty))))))
+                  (put st tag (cons type empty))))))
+
+      (define digits? (string->regex "m/^[0-9]+$/"))
 
       (define (numberish? x)
-         (if x 
-            (m/^[0-9]+$/ x)
+         (if x
+            (digits? x)
             x))
 
       (define (number->base10 n)
@@ -348,7 +350,7 @@
                      (loop q (cons (+ r #\0) out)))))))
 
       (define (gennum n)
-         (λ (rs) 
+         (λ (rs)
             (lets ((rs n (mutate-num rs n)))
                (values rs (number->base10 n)))))
 
@@ -360,12 +362,12 @@
             (if (null? attrs)
                st
                (lets
-                  ((info (getf st tag))
+                  ((info (get st tag))
                    (type known info)
-                   (attrs 
-                     (fold 
-                        (λ (known attr) 
-                           (put known (car attr) 
+                   (attrs
+                     (fold
+                        (λ (known attr)
+                           (put known (car attr)
                               (if (numberish? (cdr attr))
                                  (gennum (string->number (list->string (cdr attr)) 10))
                                  (cdr attr))))
@@ -400,11 +402,11 @@
             (λ (_ tag info)
                (lets ((type attrs info))
                   (print " - '" (list->string tag) "' is a tag of type " (if (= type open-only) 'open-only (if (= type open-single) 'open-single 'full)))
-                  (ff-fold 
+                  (ff-fold
                      (λ (_ tag val)
                         (for-each display (list "    + attribute '" (list->string tag) "'"))
                         (if val
-                           (if (function? val) 
+                           (if (function? val)
                               (print ", function generator in use")
                               (print ", e.g. '" (list->string val) "'"))
                            (print ", no value seen")))
@@ -417,7 +419,7 @@
             ((nodes (xp-parse lst))           ;; bytes → (node ...)
              (nodes (merge-bytes nodes))      ;; connect adjecent byte nodes (may be split by parser)
              (tree nodes (intern-tags tree nodes)) ;; equal? tags and attributes are now eq? - TODO pass rs and reservoir sample attrs
-             (nodes (shrubberies nodes))     ;; .. #(open X attrs) ... #(close X) ..  → .. #(tag X attrs (...)) .. 
+             (nodes (shrubberies nodes))     ;; .. #(open X attrs) ... #(close X) ..  → .. #(tag X attrs (...)) ..
              (tags (store-tags tags nodes)))
             ;(print-tag-info tags)
             (values tree tags nodes)))
@@ -445,7 +447,7 @@
             (append name
                (render-attrs attrs
                   (cons #\> tail)))))
-      
+
       (define (render-open-single-tag name attrs tail)
          (cons #\<
             (append name
@@ -495,7 +497,7 @@
       ;;;
 
       ;; pred → ((node ...) → (node' ...)) which satisfy pred
-      (define (ast-find pred) 
+      (define (ast-find pred)
          (λ (nodes)
             (define (find out n)
                (let ((out (if (pred n) (cons n out) out)))
@@ -508,11 +510,11 @@
             (if (pair? nodes)
                (fold find null nodes)
                (find null nodes))))
-     
+
       (define ast-opens
-         (ast-find 
-            (λ (x) 
-               (let ((t (ref x 1))) 
+         (ast-find
+            (λ (x)
+               (let ((t (ref x 1)))
                   (or (eq? t 'open) (eq? t 'tag) (eq? t 'open-single))))))
 
       (define ast-tags ;; only tags with content and an explicit end
@@ -534,7 +536,7 @@
                (if (eq? n np)
                   (tuple-case n
                      ((tag name attrs content)
-                        (tuple 'tag name attrs 
+                        (tuple 'tag name attrs
                            (map edit content)))
                      (else n))
                   np)))
@@ -557,13 +559,13 @@
                    (b opts opts))
                   (values rs tags
                      (ast-edit ns
-                        (λ (node) 
-                           (cond 
-                              ((eq? node a) b) 
-                              ((eq? node b) a) 
+                        (λ (node)
+                           (cond
+                              ((eq? node a) b)
+                              ((eq? node b) a)
                               (else node)))))))))
 
-      ;; note: tags is not empty, because mutator is only called if there is at 
+      ;; note: tags is not empty, because mutator is only called if there is at
       ;; least one open-tag in the data, which is stored to tags prior to mutation
       (define (random-tag rs tags)
          (rand-elem rs (keys tags)))
@@ -584,9 +586,9 @@
                      (loop rs picked (cdr attrs)))))))
 
       (define (generate-node rs tags node)
-         (lets 
+         (lets
             ((rs tag (random-tag rs tags))
-             (info (getf tags tag))
+             (info (get tags tag))
              (type attrs info)
              (rs attrs (random-attrs rs attrs)))
             ;(print "generating a '" (list->string tag) "'-tag with attrs " attrs)
@@ -594,7 +596,7 @@
                (cond
                   ((eq? type open-only) ;; <foo src=baz>
                      ;; goes always to left for now, so cannot be after a tag at end
-                     (tuple 'plus 
+                     (tuple 'plus
                         (tuple 'open tag attrs)
                         node))
                   ((eq? type open-single)
@@ -608,7 +610,7 @@
 
       ;; generate a tag next to or around a leaf byte sequence
       (define (xp-insert rs tags ns)
-         (lets 
+         (lets
             ((opts (ast-bytes-tags ns))
              (opts (if (null? opts) (ast-any ns) opts))
              (rs target (rand-elem rs opts))
@@ -626,7 +628,7 @@
                    (edit (λ (x) (if (eq? x target) (tuple 'plus x x) x))))
                   (values rs tags (ast-edit ns edit))))))
 
-      ;; each pump-step can grow a data block by a little less than 
+      ;; each pump-step can grow a data block by a little less than
       ;; its size, so a max of 15 bits can lead to an occasional <128MB
       ;; output (intentionally)
 
@@ -643,7 +645,7 @@
       ;; choose one, preferably from the beginning
       (define (pick-some rs lst)
          (let loop ((rs rs) (this (car lst)) (lst (cdr lst)))
-            (if (null? lst) 
+            (if (null? lst)
                (values rs this)
                (lets ((d rs (uncons rs #false)))
                   (if (eq? 0 (fxand d 1))
@@ -663,7 +665,7 @@
                    (targets (filter (λ (x) (not (eq? x start))) targets))) ;; don't target self (no changes)
                   (if (null? targets) ;; don't want to target closes or opens, could break too much structure
                      (values rs tags ns)
-                     (lets 
+                     (lets
                         ((rs end (rand-elem rs targets))
                          (rs n (pumps rs)))
                         ;(print "Pumping " n " times path between '" (list->string (xp-render start)) "' up to '" (list->string (xp-render end)) "'")
@@ -675,9 +677,9 @@
                                  (ast-edit start (λ (x) (if (eq? x end) branch x))))))))))))
 
       (define (repeat-node rs node)
-         (lets 
+         (lets
             ((rs n (pumps rs)))
-            (values rs 
+            (values rs
                (let loop ((out node) (n n))
                   (if (eq? n 0)
                      out
@@ -695,7 +697,7 @@
                   (values rs tags (ast-edit ns edit))))))
 
       (define (random-mutator rs)
-         (lets 
+         (lets
             ((rs x (rand rs 6)))
             (cond
                ((eq? x 0) (values rs xp-swap 'xp-swap))         ;; two nodes exchange positions
@@ -705,7 +707,7 @@
                (else      (values rs xp-insert 'xp-insert)))))  ;; a new nodes is born
 
       (define (mutate rs tags nodes)
-         (lets 
+         (lets
             ((rs muta op-name (random-mutator rs))
              (rs tags ns (muta rs tags nodes)))
             (if (eq? ns nodes) ;; mutation failed, try something else
@@ -730,17 +732,17 @@
          (λ (rs ll meta)
             (lets ((tree tags nodes (xp-process tree tags (vector->list (car ll)))))
                (if (taggy? nodes)
-                  (lets 
+                  (lets
                      ((rs tags nodes op-name (mutate rs tags nodes))
                       (lst (xp-render nodes)))
-                     (values (xp-mutator tree tags) rs 
-                        (flush-bvecs lst (cdr ll)) 
+                     (values (xp-mutator tree tags) rs
+                        (flush-bvecs lst (cdr ll))
                         (inc meta op-name)
                         +1))
                   (values (xp-mutator tree tags) rs ll meta -1))))) ;; Doesn't look too XMLish to me
 
-      (define xp-mutate 
-         (xp-mutator #empty #empty))))
+      (define xp-mutate
+         (xp-mutator empty empty))))
 
 
 
@@ -771,7 +773,7 @@
 ;            (append name
 ;               (render-attrs attrs
 ;                  (ilist #\> #\newline tail)))))
-;      
+;
 ;      (define (render-open-single-tag name attrs tail)
 ;         (cons #\<
 ;            (append name
@@ -793,7 +795,7 @@
 ;                  (tuple-case exp
 ;                     ((bytes bs)
 ;                        (indent i
-;                           (append bs 
+;                           (append bs
 ;                              (cons #\newline tail))))
 ;                     ((tag name attrs content)
 ;                        (indent i
@@ -819,7 +821,7 @@
 ;                  (print*-to stderr (list "WTN IS " exp "???"))
 ;                  (exit-owl 126))))
 ;         (ren exp 0 null))
-;      
+;
 ;      (define (pretty-print exp)
 ;         (let ((output (pretty-render exp)))
 ;            (write-vector (list->vector output) stdout)))

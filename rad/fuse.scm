@@ -6,13 +6,13 @@
 
    (export fuse)
 
-   (import 
-      (owl base))
+   (import
+      (owl toplevel))
 
    (begin
 
       (define null '())
-      
+
       (define search-fuel 100000)
 
       (define search-stop-ip 8)
@@ -23,7 +23,7 @@
             (cons (car lst)
                (jump (cdr lst) from to))))
 
-      (define (suffixes lst)  
+      (define (suffixes lst)
          (if (null? lst)
             null
             (cons lst (suffixes (cdr lst)))))
@@ -38,7 +38,7 @@
             empty sufs))
 
       (define (any-position-pair rs nodes)
-         (lets 
+         (lets
             ((rs node (rand-elem rs nodes))
              (froms tos node)
              (rs from (rand-elem rs froms))
@@ -57,7 +57,7 @@
              (sbs (char-suffixes (cdr node))))
             (ff-fold
                (λ (tl char sufs) ;; all suffixes in a after prefix+char
-                  (let ((bs (getf sbs char)))
+                  (let ((bs (get sbs char)))
                      (if bs ;; there were some also in b
                         (cons (cons sufs bs) tl)
                         tl))) ;; nothing shared after char
@@ -65,7 +65,7 @@
 
       (define (alternate-suffixes rs a)
         (let loop ((rs rs) (a (cdr a)) (al (list a)) (bl (list a)))
-          (if (null? a) 
+          (if (null? a)
             (values rs al bl)
             (lets ((d rs (uncons rs #false)))
               (if (eq? 1 (fxand d 1))

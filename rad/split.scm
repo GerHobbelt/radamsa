@@ -18,7 +18,7 @@
 ;    - split around {#\,, #\space, #\tab, ...} and do as above
 
 ;; pros/cons
-; stupid: 
+; stupid:
 ;   + trivial to implement
 ;   - will break nested structures
 ; tree level:
@@ -27,12 +27,12 @@
 ;   - won't adapt to unknown targets with similar structure
 ; black box:
 ;   + adapts to unknown targets
-;   - will break nested structures 
+;   - will break nested structures
 
 (define-library (rad split)
 
    (import
-      (owl base))
+      (owl toplevel))
 
    (export
       split-lense)

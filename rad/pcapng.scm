@@ -3,7 +3,7 @@
   (import
     (owl list-extra)
     (scheme base)
-    (owl base)
+    (owl toplevel)
     (owl lazy))
 
   (export
@@ -93,7 +93,7 @@
     ;; instrumentation
 
     (define (pcapng-input? dict)
-      (string=? "pcapng" (caar (getf dict 'generators))))
+      (string=? "pcapng" (caar (get dict 'generators))))
 
     (define (pcapng-block-to-mutate? block)
       (equal? '(#x06 #x00 #x00 #x00) (take (vector->list block) 4)))

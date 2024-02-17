@@ -3,19 +3,18 @@
 ;;;
 
 
-;; a generator 
+;; a generator
 
 (define-library (rad generators)
 
    (import
-      (owl base)
+      (owl toplevel)
       (owl sys)
       (rad shared)
       (rad fuse)
-      (only (owl primop) halt)
       (rad pcapng))
 
-   (export 
+   (export
       string->generator-priorities         ;; done at cl args parsing time
       generator-priorities->generator      ;; done after cl args
       stream-port
@@ -25,7 +24,7 @@
    (begin
 
       (define null '())
-      
+
       (define (rand-block-size rs)
          (lets ((rs n (rand rs max-block-size)))
             (values rs (max n min-block-size))))
@@ -39,7 +38,7 @@
       (define (finish rs len)
          null)
 
-      ;; store length so that extra data can be generated in case of no or very 
+      ;; store length so that extra data can be generated in case of no or very
       ;; little sample data, which would cause one or very few possible outputs
 
       (define (stream-port rs port)
@@ -71,7 +70,7 @@
             (let ((block-type (bytes->uint32 (take block-header 4))))
                (if (and (equal? block-type #x0A0D0D0A) (>= (length block-body) 4))
                   (let ((byte-order-magic (take block-body 4)))
-                     (cond 
+                     (cond
                         ((equal? byte-order-magic '(#x1A #x2B #x3C #x4D))
                            ;; 'big-endian
                            (print "pcapng-port->stream (recognize-endianness): big-endian is not supported")
@@ -85,10 +84,10 @@
                            (close-port port)
                            (halt 1))))
                   default-endianness)))
-         
+
          (define (read-block-header port)
             (let ((block-header (read-bytevector 8 port)))
-               (cond 
+               (cond
                   ((eof-object? block-header)
                      (close-port port)
                      null)
@@ -98,13 +97,13 @@
                      (print "pcapng-port->stream: cannot read the initial 8 bytes of the current block")
                      (close-port port)
                      (halt 1)))))
-         
+
          (define (read-block-content port block-header)
             (let* ((block-type (bytes->uint32 (take block-header 4)))
                    (block-length (bytes->uint32 (drop block-header 4)))
                    (block-content-length (- block-length 12))
                    (block-content (read-bytevector block-content-length port)))
-               (cond 
+               (cond
                   ((eof-object? block-content)
                      (print "pcapng-port->stream: cannot read block content, encountered end of file earlier than expected")
                      (close-port port)
@@ -115,11 +114,11 @@
                      (print "pcapng-port->stream: cannot read block content, received less than expected (length=" block-content-length ")")
                      (close-port port)
                      (halt 3)))))
-         
+
          (define (read-last-block-length port block-header)
             (let ((expected-block-length (bytes->uint32 (drop block-header 4)))
                   (last-block-length (read-bytevector 4 port)))
-               (cond 
+               (cond
                   ((eof-object? last-block-length)
                      (print "pcapng-port->stream:  cannot read last block length, encountered end of file earlier than expected")
                      (close-port port)
@@ -131,7 +130,7 @@
                      (print "pcapng-port->stream:  bad last block length")
                      (close-port port)
                      (halt 5)))))
-         
+
          (define (read-next-block port endianness)
             (let ((block-header (read-block-header port)))
                (if (not (null? block-header))
@@ -145,15 +144,15 @@
                               (values null endianness #false)))
                         (values null endianness #false)))
                   (values null endianness #false))))
-         
+
          (let loop ((endianness 'little-endian) (encountered-interesting-block #false))
-            (lets 
+            (lets
                ((block endianness encountered-new-interesting-block (read-next-block port endianness)))
                (if (not (null? block))
                   (pair block (loop endianness (or encountered-interesting-block encountered-new-interesting-block)))
                   (if encountered-interesting-block
                      null
-                     (begin 
+                     (begin
                         (print "pcapng-port->stream: you must provide a file which has at least an EPB block to mutate!")
                         (halt 6)))))))
 
@@ -166,7 +165,7 @@
       ;; dict paths → gen
       ;; gen :: rs → rs' ll meta
       (define (stdin-generator rs online?)
-         (lets 
+         (lets
             ((rs ll (port->stream rs stdin))
              (ll (if online? ll (force-ll ll)))) ;; preread if necessary
             (λ (rs)
@@ -181,7 +180,7 @@
                (random-block rs (- n 1) (cons (fxand digit 255) out)))))
 
       (define (random-stream rs)
-         (lets 
+         (lets
             ((rs n (rand-range rs 32 max-block-size))
              (rs b (random-block rs n null))
              (rs ip (rand-range rs 1 100))
@@ -189,10 +188,10 @@
             (if (eq? o 0) ;; end
                (list b)
                (pair b (random-stream rs)))))
-      
+
       (define (random-generator rs)
          (lets ((rs seed (rand rs #x1000000000000000000)))
-            (values rs 
+            (values rs
                (random-stream (seed->rands seed))
                (put empty 'generator 'random))))
 
@@ -201,7 +200,7 @@
             (print*-to stderr (list "Error: failed to open '" path "'. Please use -r if you want to include samples from directories."))
             (print*-to stderr (list "Error: failed to open '" path "'")))
          (halt exit-read-error))
-         
+
       ;; paths → (rs → rs' ll|#false meta|error-str)
       (define (file-streamer paths)
          (lets
@@ -213,7 +212,7 @@
                    (port (open-input-file path)))
                   (if port
                      (lets ((rs ll (port->stream rs port)))
-                        (values rs ll 
+                        (values rs ll
                            (list->ff (list '(generator . file) (cons 'source path)))))
                      (fatal-read-error path))))
             gen))
@@ -221,7 +220,7 @@
       (define (pcapng-streamer paths)
          (define (gen rs)
             (if (= (vector-length paths) 1)
-               (lets 
+               (lets
                   ((path (vector-ref paths 0))
                    (port (open-input-file path)))
                   (if port
@@ -238,11 +237,11 @@
             ((null? ll) ll)
             ((pair? ll) (consume (cdr ll)))
             (else (consume (ll)))))
-         
+
       (define (walk-to-jump rs ip a as b bs)
          (lets
             ((finish
-               (λ () 
+               (λ ()
                   (lets
                      ((a (vector->list a))
                       (b (vector->list b))
@@ -257,11 +256,11 @@
                   (if aa
                      (lets ((rs n (rand rs 3)))
                         (if (eq? n 0)
-                           (cons a 
+                           (cons a
                               (walk-to-jump rs ip aa as b bs))
                            (lets ((bb bs (uncons bs #false)))
                               (if bb
-                                 (cons a 
+                                 (cons a
                                     (walk-to-jump rs ip aa as bb bs))
                                  (finish)))))
                      (finish))))))
@@ -296,15 +295,18 @@
                            (values rs
                               (jump-somewhere (seed->rands seed) lla llb)
                               (list->ff
-                                 (list 
+                                 (list
                                     '(generator . jump)
                                     (cons 'head a)
                                     (cons 'tail b)))))))))
             gen))
 
+      (define cut-= (string->regex "c/=/"))
+      (define cut-comma (string->regex "c/,/"))
+
       (define (string->generator-priorities str)
          (lets
-            ((ps (map c/=/ (c/,/ str))) ; ((name [priority-str]) ..)
+            ((ps (map cut-= (cut-comma str))) ; ((name [priority-str]) ..)
              (ps (map selection->priority ps)))
             (if (every self ps) ps #false)))
 
@@ -356,7 +358,7 @@
                   (fail "Bad generator priority")))))
 
       (define (generator-priorities->generator rs pris args fail n)
-         (lets 
+         (lets
             ((gs (map (priority->generator rs args fail n) pris))
              (gs (filter self gs)))
             (cond

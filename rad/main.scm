@@ -1,15 +1,15 @@
 #!/usr/bin/ol -r
 
-;;; 
-;;; Radamsa 
+;;;
+;;; Radamsa
 ;;;
 
 (define-library (rad main)
 
    (import
-      (owl base)
+      (owl toplevel)
       (owl args)
-      (owl sys)
+      (except (owl sys) pipe)
       (rad generators)
       (rad output)
       (rad digest)
@@ -18,33 +18,33 @@
       (rad shared)
       (rad pcapng))
 
-   (export 
+   (export
       urandom-seed
       radamsa)
 
    (begin
 
       (define null '())
-      
+
       (define (string->count str)
          (cond
             ((member str '("inf" "infinity" "-1" "forever"))
                'infinity)
             ((string->number str 10) =>
-               (λ (n) 
+               (λ (n)
                   (if (> n 0)
                      n
                      #false)))
             (else #f)))
 
-      (define version-str "Radamsa 0.6")
+      (define version-str "Radamsa 0.7")
 
       (define usage-text "Usage: radamsa [arguments] [file ...]")
 
-      (define about-text 
+      (define about-text
 
-"Radamsa is a general purpose fuzzer. It modifies given sample data 
-in ways, which might expose errors in programs intended to process 
+"Radamsa is a general purpose fuzzer. It modifies given sample data
+in ways, which might expose errors in programs intended to process
 the data. For more information, read the fine manual page, or visit
 https://gitlab.com/akihe/radamsa.
 
@@ -56,8 +56,6 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                i
                #false)))
 
-      
-               
       (define command-line-rules
          (cl-rules
             `((help "-h" "--help" comment "show this thing")
@@ -91,7 +89,9 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
               (csums "-C" "--checksums" has-arg default "10000" cook ,string->natural
                     comment "maximum number of checksums in uniqueness filter (0 disables)")
               (hash "-H" "--hash" cook ,string->hash default "stream"
-                    comment "hash algorithm for uniqueness checks (stream or sha256)")
+                    comment "hash algorithm for uniqueness checks (stream, sha1 or sha256)")
+              (output-template-string #f "--output-template" has-arg
+                    comment "Output template. %f is fuzzed data. e.g. \"<html>%f</html>\"")
               (verbose "-v" "--verbose" comment "show progress during generation"))))
 
       ;; () → string
@@ -107,7 +107,7 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
 
       ;; () → string (decimal number)
       (define (time-seed)
-         (fold 
+         (fold
             (lambda (n b) (bior (<< n 8) b))
             0 (sha256-bytes (str (time-ms)))))
 
@@ -133,12 +133,12 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
             (verb n '("b" "K" "M" "T" "P"))))
 
       (define (serialize-meta val)
-         (if (ff? val)
+         (if (function? val)
             (ff-fold
                (λ (out key val)
                   (render key
                      (ilist #\: #\space
-                        ((if (string? val) (make-serializer #empty) render)
+                        ((if (string? val) (make-serializer empty) render)
                            val
                            (if (null? out)
                               '(#\newline)
@@ -147,30 +147,30 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
 
       (define (verbose-target meta)
          (cond
-            ((getf meta 'path) =>
+            ((get meta 'path) =>
                (λ (path) path))
-            ((eq? 'tcp-client (getf meta 'output))
+            ((eq? 'tcp-client (get meta 'output))
                (str
-                  (get meta 'ip '?) ":" (get meta 'port '?) "/" 
+                  (get meta 'ip '?) ":" (get meta 'port '?) "/"
                   (get meta 'nth 0)))
-            ((eq? 'tcp-server (getf meta 'output))
-               (str ":" (get meta 'port '?) "/" 
+            ((eq? 'tcp-server (get meta 'output))
+               (str ":" (get meta 'port '?) "/"
                   (get meta 'nth 0)
                   " <- " (get meta 'ip "???")))
-            (else 
+            (else
                (str (get meta 'nth 0)))))
-      
+
       ;; ... → (ff | seed | 'close → ...)
       (define (maybe-meta-logger path verbose? fail)
-         (define verb 
-            (if verbose? 
-               (λ (x) 
+         (define verb
+            (if verbose?
+               (λ (x)
                   (cond
                      ((eq? x 'close) 42)
-                     ((getf x 'seed) =>
+                     ((get x 'seed) =>
                         (λ (seed) (print*-to stderr (list "Random seed: " seed))))
                      (else
-                        (print*-to stderr 
+                        (print*-to stderr
                            (list " - " (verbose-target x)
                               ": " (verbose-size (get x 'length 0)))))))
                (λ (x) x)))
@@ -186,7 +186,7 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                      (fail "Cannot open metadata log file"))))
             (verbose?
                verb)
-            (else 
+            (else
                (λ (x) x))))
 
       (define (maybe-printer verbose)
@@ -200,15 +200,15 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
          (define (walk prefix paths out)
             (cond
                ((null? paths) out)
-               ((not (car paths)) 
+               ((not (car paths))
                   (print-to stderr
                      "Error reading sample files. Too long paths?")
-                  #false) ;; return nothing so radamsa wil exit 
-               (else 
+                  #false) ;; return nothing so radamsa wil exit
+               (else
                   (lets
                      ((this (string-append prefix (car paths))) ;; sans trailing slash
                       (subs (dir->list this)))
-                     (if subs 
+                     (if subs
                         ;; need to add the slash to current path
                         (walk prefix (cdr paths)
                            (walk (string-append this "/") subs out))
@@ -227,43 +227,65 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                   (else (loop (cdr cs) (cons (car cs) out)))))))
 
       (define K (λ (a b) a))
-     
-      ;; todo: separate generation steps properly
+
+      (define template-prelude (string->regex "s/%f.*//"))
+      (define template-finale (string->regex "s/.*%f//"))
+
+      ;; currently assumes just one occurrence of %f
+      (define (string->template-filler template)
+         (let ((pre (list->bytevector (string->bytes (template-prelude template))))
+               (post (list->bytevector (string->bytes (template-finale template)))))
+            (lambda (data)
+               ;; data comes from fuzzed data generationg, so it's a list of byte vectors
+               ;; followed by a tuple having metadata regarding the generation.
+               (cons pre
+                  (foldr
+                     (lambda (x tl)
+                        (if (null? tl)
+                           (list post x)
+                           (cons x tl)))
+                     null data)))))
+
       (define (run-radamsa dict paths)
          (lets/cc ret
             ((fail (λ (why) (print why) (ret 1)))
-             (rs (seed->rands (getf dict 'seed)))
-             (record-meta 
-               (maybe-meta-logger 
-                  (getf dict 'metadata)
-                  (getf dict 'verbose)
+             (rs (seed->rands (get dict 'seed)))
+             (templater
+                ;; precendence: template string > template file > "%f"
+                (string->template-filler
+                   (or (get dict 'output-template-string #f)
+                       "%f")))
+             (record-meta
+               (maybe-meta-logger
+                  (get dict 'metadata)
+                  (get dict 'verbose)
                   fail))
-             (n (getf dict 'count))
+             (n (get dict 'count))
              (end (if (number? n) (+ n (get dict 'offset 0)) n))
              (mutas (if (pcapng-input? dict)
-                  (pcapng-instrument-mutations (getf dict 'mutations))
-                       (getf dict 'mutations)))
-             (hash (getf dict 'hash))
-             (checksummer 
-                ((if (eq? 0 (getf dict 'csums)) dummy-checksummer checksummer)
+                  (pcapng-instrument-mutations (get dict 'mutations))
+                       (get dict 'mutations)))
+             (hash (get dict 'hash))
+             (checksummer
+                ((if (eq? 0 (get dict 'csums)) dummy-checksummer checksummer)
                    hash))
              (rs muta (mutators->mutator rs mutas))
              (sleeper
-              (let ((n (getf dict 'delay)))
+              (let ((n (get dict 'delay)))
                 (if n (λ () (sleep n)) (λ () 42))))
-             (gen 
+             (gen
                (generator-priorities->generator rs
-                  (getf dict 'generators) paths fail end)))
+                  (get dict 'generators) paths fail end)))
             ;; possibly save the seed to metadata
-            (record-meta (put empty 'seed (getf dict 'seed)))
-            (let loop 
+            (record-meta (put empty 'seed (get dict 'seed)))
+            (let loop
                ((rs rs)
                 (muta muta)
-                (pat (getf dict 'patterns))
+                (pat (get dict 'patterns))
                 (out (get dict 'output 'bug))
                 (offset (get dict 'offset 1))
-                (p 1) 
-                (cs (empty-digests (getf dict 'csums)))
+                (p 1)
+                (cs (empty-digests (get dict 'csums)))
                 (left (if (number? n) n -1)))
                (cond
                 ((= left 0)
@@ -271,20 +293,21 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                    0)
                 (else
                   (lets
-                     ((rs ll meta (gen rs))
+                     ((rs ll meta (gen rs))    ;; get a sample data stream
                       (meta (put meta 'nth p))
-                      (out-ll (pat rs ll muta meta))
-                      (out-lst cs csum (checksummer cs out-ll)))
-                     (if csum 
+                      (out-ll (pat rs ll muta meta)) ; apply mutator with pattern
+                      (out-lst cs csum (checksummer cs out-ll))
+                      (meta (put meta 'checksum (or csum "blank"))))
+                     (if csum
                         (if (eq? offset 1)
                            (lets
                               ((out fd meta (out meta))
-                               (rs muta generation-meta n-written 
-                                 (output out-lst fd))
-                               (meta 
-                                  (-> (ff-union meta generation-meta K)
-                                     (put 'length n-written)
-                                     (put 'checksum csum))))
+                               (rs muta generation-meta n-written
+                                 (output (templater out-lst) fd))
+
+                               (meta
+                                  (pipe (ff-union meta generation-meta K)
+                                     (put 'length n-written))))
                               (record-meta meta)
                               (sleeper)
                               (loop rs muta pat out 1 (+ p 1) cs (- left 1)))
@@ -292,7 +315,7 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                               (loop rs muta pat out (- offset 1) (+ p 1) cs left)))
                         ;; checksum match - drop duplicate
                         (loop rs muta pat out offset p cs left))))))))
-  
+
       ;; dict args → rval
       (define (start-radamsa dict paths)
          ;; show command line stuff
@@ -300,35 +323,37 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
             ((null? paths)
                ;; fuzz stdin when called as $ cat foo | radamsa | bar -
                (start-radamsa dict (list "-")))
-            ((not (getf dict 'seed))
+            ((not (get dict 'seed))
                ;; get a random seed, prefer urandom
-               (start-radamsa 
+               (start-radamsa
                   (put dict 'seed (or (urandom-seed) (time-seed)))
                   paths))
-            ((getf dict 'version)
+            ((get dict 'version)
                (print version-str)
                0)
-            ((not (getf dict 'output))
-               (let 
-                  ((os 
-                     (string->outputs 
-                        (getf dict 'output-pattern)
-                        (getf dict 'count)
-                        (pick-suffix paths))))
+            ((not (get dict 'output))
+               (let
+                  ((os
+                     (string->outputs
+                        (get dict 'output-pattern)
+                        (get dict 'count)
+                        (pick-suffix paths)
+                        (not (eq? (get dict 'csums) 0))
+                        )))
                   (if os
                      (start-radamsa (put dict 'output os) paths)
                      1)))
-            ((getf dict 'help)
+            ((get dict 'help)
                (print usage-text)
                (print-rules command-line-rules)
                0)
-            ((getf dict 'about)
+            ((get dict 'about)
                (print about-text)
                0)
-            ((getf dict 'list)
+            ((get dict 'list)
                (show-options)
                0)
-            ((getf dict 'recursive)
+            ((get dict 'recursive)
                (let ((paths (include-dirs paths)))
                   (if paths ;; could fail due to overly long paths etc
                      (start-radamsa (del dict 'recursive) paths)
@@ -337,9 +362,9 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                (run-radamsa dict paths))))
 
       (define (radamsa args)
-         (process-arguments (cdr args) 
-            command-line-rules 
-            usage-text 
+         (process-arguments (cdr args)
+            command-line-rules
+            usage-text
             start-radamsa))))
 
 (import (rad main))

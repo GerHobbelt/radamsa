@@ -1,18 +1,18 @@
 ;;;
-;;; Simple Generic Linear Mutations 
+;;; Simple Generic Linear Mutations
 ;;;
 
 (define-library (rad generic)
 
    (import
-      (owl base)
+      (owl toplevel)
       (rad fuse))
 
    (export
       list-del      ;; rs l → rs' l'
       list-del-seq  ;; rs l → rs' l'
       list-dup      ;; likewise
-      list-clone    ;; ditto 
+      list-clone    ;; ditto
       list-repeat   ;; same
       list-swap     ;; etc
       list-perm     ;
@@ -60,7 +60,7 @@
                 (rs p (rand rs len)))
                (values rs
                   (edit l p
-                     (λ (l) 
+                     (λ (l)
                         (if (null? l)
                            l
                            (cons (car l) l))))))))
@@ -93,14 +93,14 @@
                 (rs to (rand rs len)))
                (values rs (lins l to (list-ref l from))))))
 
-      ;; swap two adjecent values 
+      ;; swap two adjecent values
       (define (list-swap rs l)
          (let ((len (length l)))
             (if (< len 2)
                (values rs l)
                (lets ((rs p (rand rs (- len 1))))
                   (values rs
-                     (edit l p 
+                     (edit l p
                         (λ (l) (ilist (cadr l) (car l) (cddr l)))))))))
 
       ;; permute values
@@ -108,7 +108,7 @@
          (lets ((len (length l)))
             (if (< len 3)
                (values rs l)
-               (lets 
+               (lets
                   ((rs from (rand rs (- len 3)))
                    (rs a (rand-range rs 2 (- len from)))
                    (rs b (rand-log rs 10))
@@ -130,12 +130,12 @@
          (if (< (car st) stored-elems)
             ;; add elements until there are enough stored elements
             (lets ((rs p (rand rs len)))
-               (step-state rs 
-                  (ilist (+ 1 (car st)) 
+               (step-state rs
+                  (ilist (+ 1 (car st))
                          (list-ref l p)
                          (cdr st))
                   l len))
-            (lets 
+            (lets
                ((rs up (rand rs update-prob)))
                (if (< up stored-elems)
                   ;; update a stored element
@@ -158,7 +158,7 @@
              (rs p (rand rs n))
              (lp (edit l p (λ (tl) (cons x tl)))))
             (values rs st lp)))
-      
+
       (define (st-list-replace rs st l)
          (lets
             ((n (length l))
@@ -168,8 +168,8 @@
              (lp (edit l p (λ (tl) (cons x (cdr tl))))))
             (values rs st lp)))
 
-      ;; st-list-swap st-list-ins 
-      ;; 
+      ;; st-list-swap st-list-ins
+      ;;
 
       ;;;
       ;;; Testing
