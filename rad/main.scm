@@ -15,7 +15,8 @@
       (rad digest)
       (rad patterns)
       (rad mutations)
-      (rad shared))
+      (rad shared)
+      (rad pcapng))
 
    (export 
       radamsa)
@@ -24,7 +25,7 @@
 
       (define (string->count str)
          (cond
-            ((mem equal? '("inf" "infinity" "-1" "forever") str)
+            ((member str '("inf" "infinity" "-1" "forever"))
                'infinity)
             ((string->number str 10) =>
                (λ (n) 
@@ -42,7 +43,7 @@
 "Radamsa is a general purpose fuzzer. It modifies given sample data 
 in ways, which might expose errors in programs intended to process 
 the data. For more information, read the fine manual page, or visit
-https://github.com/aoh/radamsa.
+https://gitlab.com/akihe/radamsa.
 
 Radamsa was written by Aki Helin, initially at OUSPG.")
 
@@ -124,7 +125,7 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
          (define (verb n u)
             (if (or (< n 1024) (null? (cdr u)))
                (render n (render (car u) null))
-               (verb (div n 1024) (cdr u))))
+               (verb (quotient n 1024) (cdr u))))
          (list->string
             (verb n '("b" "K" "M" "T" "P"))))
 
@@ -236,7 +237,9 @@ Radamsa was written by Aki Helin, initially at OUSPG.")
                   fail))
              (n (getf dict 'count))
              (end (if (number? n) (+ n (get dict 'offset 0)) n))
-             (mutas (getf dict 'mutations))
+             (mutas (if (pcapng-input? dict)
+	               (pcapng-instrument-mutations (getf dict 'mutations))
+                       (getf dict 'mutations)))
              (hash (getf dict 'hash))
              (checksummer 
                 ((if (eq? 0 (getf dict 'csums)) dummy-checksummer checksummer)
