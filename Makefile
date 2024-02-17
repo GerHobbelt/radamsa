@@ -27,7 +27,7 @@ radamsa.fasl: rad/*.scm bin/ol
 	bin/ol -o radamsa.fasl rad/main.scm
 
 ol.c:
-	test -f ol.c.gz || wget -O ol.c.gz $(OWLURL) || curl -L0 -l ol.c.gz $(OWLURL)
+	test -f ol.c.gz || wget -O ol.c.gz $(OWLURL) || curl -L -o ol.c.gz $(OWLURL)
 	gzip -d < ol.c.gz > ol.c
 
 bin/ol: ol.c
@@ -82,6 +82,34 @@ future:
 	-cd owl && make bin/ol
 	cp owl/bin/ol bin/ol
 	make
+
+autofuzz: bin/radamsa
+	echo '<html> <foo bar=baz>zeb</foo> <foo babar=lol></html>' > tmp/test.xmlish
+	bin/radamsa -v -o tmp/out-%n -n 200 rad/* bin/* tmp/test.xmlish
+	bin/radamsa -v -o tmp/out-2-%n -n 200 tmp/out-* tmp/test.xmlish
+	bin/radamsa -v -o tmp/out-3-%n -n 200 tmp/out-2-* tmp/test.xmlish
+	# fuzz a million outputs 
+	bin/radamsa --seed 42 --meta million.meta -n 1000000
+	echo autofuzz complete
+
+
+## Library mode test
+
+c/libradamsa.c: c/lib.c rad/*.scm
+	# future -> use dev owl which has peek-byte
+	test -d owl || make future
+	bin/ol --mode library -o c/libradamsa.c rad/libradamsa.scm
+	sed -i 's/int main/int secondary/' c/libradamsa.c
+	cat c/lib.c >> c/libradamsa.c
+
+bin/libradamsa.a: c/libradamsa.c
+	cc -fsanitize=address -I c -o bin/libradamsa.a -c c/libradamsa.c
+
+bin/libradamsa-test: bin/libradamsa.a c/libradamsa-test.c
+	gcc -fsanitize=address -Ic -o bin/libradamsa-test c/libradamsa-test.c -Lbin -lradamsa
+
+libradamsa-test: bin/libradamsa-test
+	bin/libradamsa-test c/lib.c | grep "library test passed"
 
 uninstall:
 	rm $(DESTDIR)$(PREFIX)/bin/radamsa || echo "no radamsa"
