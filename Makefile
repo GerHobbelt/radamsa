@@ -4,7 +4,7 @@ BINDIR=/bin
 CFLAGS?=-Wall -O2
 LDFLAGS?=
 OFLAGS=-O2
-OWLURL=https://gitlab.com/owl-lisp/owl/uploads/0d0730b500976348d1e66b4a1756cdc3/ol-0.1.19.c.gz
+OWLURL=https://gitlab.com/owl-lisp/owl/uploads/38d13ea55860be90b8c0a4519810c6d5/ol-0.1.20.c.gz
 USR_BIN_OL?=/usr/bin/ol
 
 everything: bin/radamsa
@@ -63,7 +63,7 @@ fasltest: radamsa.fasl
 standalone:
 	-rm radamsa.c # likely old version
 	make radamsa.c
-   # compile without seccomp and use of syscall
+	# compile without seccomp and use of syscall
 	diet gcc -DNO_SECCOMP -O3 -Wall -o bin/radamsa radamsa.c
 
 # a quick to compile vanilla bytecode executable
@@ -95,21 +95,24 @@ autofuzz: bin/radamsa
 
 ## Library mode test
 
-c/libradamsa.c: c/lib.c rad/*.scm
-	# future -> use dev owl which has peek-byte
-	test -d owl || make future
-	bin/ol --mode library -o c/libradamsa.c rad/libradamsa.scm
+c/libradamsa.c: bin/ol c/lib.c rad/*.scm
+	bin/ol -O1 --mode library -o c/libradamsa.c rad/libradamsa.scm
 	sed -i 's/int main/int secondary/' c/libradamsa.c
 	cat c/lib.c >> c/libradamsa.c
 
-bin/libradamsa.a: c/libradamsa.c
-	cc -fsanitize=address -I c -o bin/libradamsa.a -c c/libradamsa.c
+lib/libradamsa.a: c/libradamsa.c
+	mkdir -p lib
+	cc -O2 -I c -o lib/libradamsa.a -c c/libradamsa.c
 
-bin/libradamsa-test: bin/libradamsa.a c/libradamsa-test.c
-	gcc -fsanitize=address -Ic -o bin/libradamsa-test c/libradamsa-test.c -Lbin -lradamsa
+bin/libradamsa-test: lib/libradamsa.a c/libradamsa-test.c
+	mkdir -p tmp
+	cc -O2 -Ic -o bin/libradamsa-test c/libradamsa-test.c -Llib -lradamsa
 
 libradamsa-test: bin/libradamsa-test
 	bin/libradamsa-test c/lib.c | grep "library test passed"
+
+
+## Cleanup and Meta
 
 uninstall:
 	rm $(DESTDIR)$(PREFIX)/bin/radamsa || echo "no radamsa"
