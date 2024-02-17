@@ -4,8 +4,8 @@ BINDIR=/bin
 CFLAGS?=-Wall -O2
 LDFLAGS?=
 OFLAGS=-O2
-OWLURL=https://gitlab.com/owl-lisp/owl/uploads/87ffa9dad2bc59fc0ac5efcd90db4c7c/ol-0.1.16.c.gz
-USR_BIN_OL=/usr/bin/ol
+OWLURL=https://gitlab.com/owl-lisp/owl/uploads/0d0730b500976348d1e66b4a1756cdc3/ol-0.1.19.c.gz
+USR_BIN_OL?=/usr/bin/ol
 
 everything: bin/radamsa
 
@@ -47,6 +47,7 @@ clean:
 
 mrproper: clean
 	-rm -rf ol-*
+	-rm -rf owl
 
 test: .seal-of-quality
 
@@ -74,6 +75,13 @@ bytecode: bin/ol
 # a simple mutation benchmark
 benchmark: bin/radamsa
 	tests/benchmark bin/radamsa
+
+future:
+	test -d owl || git clone https://gitlab.com/owl-lisp/owl
+	#cd owl && git pull
+	-cd owl && make bin/ol
+	cp owl/bin/ol bin/ol
+	make
 
 uninstall:
 	rm $(DESTDIR)$(PREFIX)/bin/radamsa || echo "no radamsa"
