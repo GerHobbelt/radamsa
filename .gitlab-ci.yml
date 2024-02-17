@@ -1,0 +1,13 @@
+image: gcc
+
+stages:
+  - build
+  - test
+
+build binary:
+  stage: build
+  script: make
+
+run tests:
+  stage: test
+  script: make test

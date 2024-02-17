@@ -14,6 +14,7 @@
    (export 
       string->generator-priorities         ;; done at cl args parsing time
       generator-priorities->generator      ;; done after cl args
+      stream-port
       )
 
    (begin
@@ -39,13 +40,13 @@
             (let loop ((rs rs) (last #false) (wanted first) (len 0)) ;; 0 = block ready (if any)
                (let ((block (get-block port wanted)))
                   (cond
-                     ((eof? block) ;; end of stream
-                        (if (not (eq? port stdin)) (fclose port))
+                     ((eof-object? block) ;; end of stream
+                        (if (not (eq? port stdin)) (close-port port))
                         (if last
                            (cons last (finish rs (+ len (sizeb last))))
                            (finish rs len)))
                      ((not block) ;; read error, could be treated as error
-                        (if (not (eq? port stdin)) (fclose port))
+                        (if (not (eq? port stdin)) (close-port port))
                         (if last (list last) null))
                      ((eq? (sizeb block) wanted)
                         ;; a block of required (deterministic) size is ready
